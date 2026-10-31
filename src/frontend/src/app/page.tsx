@@ -9,6 +9,7 @@ import { MultiPdfUpload } from "../components/papers/MultiPdfUpload";
 import { ResearchPapersView } from "../components/papers/ResearchPapersView";
 import { PaperIntelligenceView } from "../components/intelligence/PaperIntelligenceView";
 import { ResearchSummariesView } from "../components/summaries/ResearchSummariesView";
+import { CrossPaperSynthesisView } from "../components/synthesis/CrossPaperSynthesisView";
 import { PlaceholderView } from "../components/common/PlaceholderView";
 import { SettingsView } from "../components/settings/SettingsView";
 import { CreateProjectModal } from "../components/projects/CreateProjectModal";
@@ -43,16 +44,9 @@ export default function Home() {
         );
       case "synthesis":
         return (
-          <PlaceholderView
-            title="Cross-Paper Synthesis & Disagreement Engine"
-            phase="Phase 3"
-            description="Multi-document cross-paper synthesis exposing consensus areas, methodological divergences, and contextual nuances between contrasting publications."
-            features={[
-              "Multi-paper consensus aggregation",
-              "Contextual disagreement isolation (varying datasets/metrics)",
-              "Comparative methodology analysis",
-              "Nuance-aware variable correlation"
-            ]}
+          <CrossPaperSynthesisView
+            currentProject={activeProject}
+            onSelectProject={(p) => setActiveProject(p)}
           />
         );
       case "claims":

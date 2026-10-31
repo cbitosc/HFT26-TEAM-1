@@ -240,3 +240,86 @@ export interface ProjectSummariesListResponse {
   total_summaries: number;
   summaries: SummaryResponse[];
 }
+
+export type DisagreementClassification =
+  | 'DIRECT_CONTRADICTION'
+  | 'CONTEXTUAL_DISAGREEMENT'
+  | 'NON_COMPARABLE'
+  | 'INSUFFICIENT_EVIDENCE'
+  | 'CONSENSUS';
+
+export interface PaperEvidence {
+  paper_id: string;
+  paper_title: string;
+  passage_id?: string | null;
+  exact_quote?: string | null;
+  page_number?: number | null;
+  claim_summary: string;
+  is_verified: boolean;
+  match_score: number;
+}
+
+export interface ComparisonDimensionItem {
+  dimension_name: string;
+  paper_values: Record<string, string>;
+  evidence: PaperEvidence[];
+  synthesis_notes: string;
+}
+
+export interface DisagreementItem {
+  id: string;
+  topic: string;
+  classification: DisagreementClassification;
+  description: string;
+  paper_a_claim: PaperEvidence;
+  paper_b_claim: PaperEvidence;
+  contextual_factors: string[];
+  explanation: string;
+  uncertainty_notes?: string | null;
+}
+
+export interface ConsensusItem {
+  id: string;
+  topic: string;
+  consensus_statement: string;
+  supporting_papers: PaperEvidence[];
+  strength: 'STRONG' | 'MODERATE' | 'PRELIMINARY';
+}
+
+export interface SideBySidePaperProfile {
+  paper_id: string;
+  title: string;
+  authors: string[];
+  year?: number | null;
+  objective: string;
+  methodology: string;
+  models: string[];
+  datasets: string[];
+  metrics: string[];
+  limitations: string[];
+}
+
+export interface ComparisonResponse {
+  id: string;
+  project_id: string;
+  paper_ids: string[];
+  topic: string;
+  paper_profiles: SideBySidePaperProfile[];
+  dimension_matrix: ComparisonDimensionItem[];
+  disagreements: DisagreementItem[];
+  consensus_points: ConsensusItem[];
+  all_evidence: PaperEvidence[];
+  total_citations: number;
+  verified_citations: number;
+  faithfulness_rate: number;
+  model_name: string;
+  prompt_version: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProjectComparisonsListResponse {
+  project_id: string;
+  total_comparisons: number;
+  comparisons: ComparisonResponse[];
+}
