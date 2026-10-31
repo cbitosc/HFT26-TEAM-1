@@ -405,3 +405,80 @@ export interface OutputClaimsResponse {
   created_at: string;
 }
 
+// Phase 7: Tri-State Claim Verification & Hybrid Retrieval Types
+export type EvidenceVerdict = 'Supported' | 'Contradicted' | 'Unresolved';
+
+export type EvidenceStrength =
+  | 'Direct evidence'
+  | 'Partial evidence'
+  | 'Conflicting evidence'
+  | 'Insufficient evidence';
+
+export interface CitedEvidencePassage {
+  passage_id: string;
+  paper_id: string;
+  paper_title?: string | null;
+  page_number: number;
+  section_title: string;
+  exact_quote: string;
+  relationship: string;
+  evidence_type: string;
+  is_quote_valid: boolean;
+  quote_match_score: number;
+  semantic_entailment: boolean;
+  explanation: string;
+}
+
+export interface ClaimVerificationResult {
+  id: string;
+  claim_id: string;
+  project_id: string;
+  claim_text: string;
+  verdict: EvidenceVerdict;
+  reasoning: string;
+  evidence_strength: EvidenceStrength;
+  cited_evidence: CitedEvidencePassage[];
+  limitations: string[];
+  retrieved_passages_count: number;
+  numerical_check_passed?: boolean | null;
+  validation_passed: boolean;
+  downgraded: boolean;
+  downgrade_reason?: string | null;
+  model_name: string;
+  prompt_version: string;
+  retrieval_version: string;
+  created_at: string;
+}
+
+export interface VerifyClaimRequest {
+  claim_id: string;
+  project_id: string;
+  paper_ids?: string[];
+  force_regenerate?: boolean;
+}
+
+export interface VerifyBatchRequest {
+  claim_ids: string[];
+  project_id: string;
+  paper_ids?: string[];
+}
+
+export interface VerifyBatchResponse {
+  total_claims: number;
+  successful: number;
+  failed: number;
+  results: ClaimVerificationResult[];
+}
+
+export interface ProjectVerificationSummary {
+  project_id: string;
+  total_claims: number;
+  verified_claims: number;
+  supported_count: number;
+  contradicted_count: number;
+  unresolved_count: number;
+  unverified_count: number;
+  faithfulness_rate: number;
+}
+
+

@@ -9,6 +9,17 @@ from .claim import (
     DecomposeClaimsRequest,
     OutputClaimsResponse,
 )
+from .verification import (
+    EvidenceVerdict,
+    EvidenceStrength,
+    RetrievedCandidate,
+    CitedEvidencePassage,
+    ClaimVerificationResult,
+    VerifyClaimRequest,
+    VerifyBatchRequest,
+    VerifyBatchResponse,
+    ProjectVerificationSummary,
+)
 
 __all__ = [
     "ClaimCategory",
@@ -19,4 +30,13 @@ __all__ = [
     "ParagraphDecomposition",
     "DecomposeClaimsRequest",
     "OutputClaimsResponse",
+    "EvidenceVerdict",
+    "EvidenceStrength",
+    "RetrievedCandidate",
+    "CitedEvidencePassage",
+    "ClaimVerificationResult",
+    "VerifyClaimRequest",
+    "VerifyBatchRequest",
+    "VerifyBatchResponse",
+    "ProjectVerificationSummary",
 ]

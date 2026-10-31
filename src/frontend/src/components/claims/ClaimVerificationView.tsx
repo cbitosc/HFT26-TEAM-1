@@ -8,17 +8,27 @@ import {
   OutputClaimsResponse,
   AtomicClaim,
   SentenceDecomposition,
-  ClaimCategory
+  ClaimCategory,
+  EvidenceVerdict,
+  ClaimVerificationResult,
+  ProjectVerificationSummary,
+  CitedEvidencePassage
 } from "../../types";
 import {
   fetchProjects,
   fetchProjectSummaries,
   fetchProjectComparisons,
   decomposeClaims,
-  fetchOutputClaims
+  fetchOutputClaims,
+  verifyClaim,
+  verifyBatchClaims,
+  fetchProjectVerificationSummary,
+  fetchSignedUrl
 } from "../../lib/api";
 import {
   CheckCircle2,
+  XCircle,
+  HelpCircle,
   AlertTriangle,
   Layers,
   FileText,
@@ -38,8 +48,12 @@ import {
   BookOpen,
   SlidersHorizontal,
   ExternalLink,
-  HelpCircle,
-  BarChart3
+  ShieldCheck,
+  ShieldAlert,
+  ShieldQuestion,
+  BarChart3,
+  Check,
+  X
 } from "lucide-react";
 
 interface ClaimVerificationViewProps {
@@ -66,6 +80,13 @@ export const ClaimVerificationView: React.FC<ClaimVerificationViewProps> = ({
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Phase 7: Verification state
+  const [verifications, setVerifications] = useState<Record<string, ClaimVerificationResult>>({});
+  const [isVerifying, setIsVerifying] = useState<boolean>(false);
+  const [verifyingClaimId, setVerifyingClaimId] = useState<string | null>(null);
+  const [verificationSummary, setVerificationSummary] = useState<ProjectVerificationSummary | null>(null);
+  const [activeVerification, setActiveVerification] = useState<ClaimVerificationResult | null>(null);
+
   // Selection & UI filtering state
   const [selectedClaimIds, setSelectedClaimIds] = useState<Set<string>>(new Set());
   const [activeSentenceKey, setActiveSentenceKey] = useState<string | null>(null); // "p-s"
@@ -73,6 +94,7 @@ export const ClaimVerificationView: React.FC<ClaimVerificationViewProps> = ({
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [atomicityFilter, setAtomicityFilter] = useState<string>("all"); // "all" | "atomic" | "compound"
+  const [verdictFilter, setVerdictFilter] = useState<string>("all"); // "all" | "Supported" | "Contradicted" | "Unresolved" | "Unverified"
   const [viewMode, setViewMode] = useState<"split" | "prose" | "claims">("split");
 
   // Load project list on mount
@@ -94,7 +116,7 @@ export const ClaimVerificationView: React.FC<ClaimVerificationViewProps> = ({
     }
   }, [currentProject]);
 
-  // Load summaries and comparisons when selectedProjectId changes
+  // Load summaries, comparisons, and verification metrics
   useEffect(() => {
     if (!selectedProjectId) return;
     setError(null);
@@ -103,12 +125,13 @@ export const ClaimVerificationView: React.FC<ClaimVerificationViewProps> = ({
 
     Promise.all([
       fetchProjectSummaries(selectedProjectId).catch(() => ({ summaries: [] })),
-      fetchProjectComparisons(selectedProjectId).catch(() => ({ comparisons: [] }))
-    ]).then(([sumRes, compRes]) => {
+      fetchProjectComparisons(selectedProjectId).catch(() => ({ comparisons: [] })),
+      fetchProjectVerificationSummary(selectedProjectId).catch(() => null)
+    ]).then(([sumRes, compRes, summaryRes]) => {
       setSummaries(sumRes.summaries || []);
       setComparisons(compRes.comparisons || []);
+      if (summaryRes) setVerificationSummary(summaryRes);
 
-      // Auto-select the first available summary or comparison
       if (sumRes.summaries && sumRes.summaries.length > 0) {
         setSelectedOutputId(sumRes.summaries[0].id);
         setIsCustomText(false);
@@ -157,7 +180,6 @@ export const ClaimVerificationView: React.FC<ClaimVerificationViewProps> = ({
       });
 
       setClaimsData(res);
-      // Default: select all atomic claims
       const initialSelected = new Set<string>();
       res.claims.forEach((c) => {
         if (c.is_atomic) initialSelected.add(c.id);
@@ -168,6 +190,75 @@ export const ClaimVerificationView: React.FC<ClaimVerificationViewProps> = ({
       setError(err.message || "Failed to decompose claims into atomic propositions.");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Phase 7: Single Claim Verification
+  const handleVerifySingle = async (claimId: string) => {
+    if (!selectedProjectId) return;
+    setVerifyingClaimId(claimId);
+    setError(null);
+
+    try {
+      const res = await verifyClaim({
+        claim_id: claimId,
+        project_id: selectedProjectId,
+        force_regenerate: true
+      });
+
+      setVerifications((prev) => ({ ...prev, [claimId]: res }));
+
+      // Refresh project summary
+      fetchProjectVerificationSummary(selectedProjectId)
+        .then((s) => setVerificationSummary(s))
+        .catch(() => {});
+    } catch (err: any) {
+      console.error(`Verification failed for claim ${claimId}:`, err);
+      setError(err.message || "Verification failed.");
+    } finally {
+      setVerifyingClaimId(null);
+    }
+  };
+
+  // Phase 7: Batch Claim Verification
+  const handleVerifySelected = async () => {
+    if (!selectedProjectId || selectedClaimIds.size === 0) return;
+    setIsVerifying(true);
+    setError(null);
+
+    try {
+      const claimIdsList = Array.from(selectedClaimIds);
+      const res = await verifyBatchClaims({
+        claim_ids: claimIdsList,
+        project_id: selectedProjectId
+      });
+
+      const nextMap = { ...verifications };
+      res.results.forEach((r) => {
+        nextMap[r.claim_id] = r;
+      });
+      setVerifications(nextMap);
+
+      // Refresh project summary
+      fetchProjectVerificationSummary(selectedProjectId)
+        .then((s) => setVerificationSummary(s))
+        .catch(() => {});
+    } catch (err: any) {
+      console.error("Batch verification failed:", err);
+      setError(err.message || "Batch claim verification failed.");
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  // Open PDF viewer via signed URL
+  const handleOpenPdf = async (paperId: string, pageNumber: number) => {
+    try {
+      const { signed_url } = await fetchSignedUrl(paperId);
+      const urlWithPage = `${signed_url}#page=${pageNumber}`;
+      window.open(urlWithPage, "_blank");
+    } catch (err: any) {
+      alert("Unable to open private PDF: " + (err.message || "Unknown error"));
     }
   };
 
@@ -185,24 +276,19 @@ export const ClaimVerificationView: React.FC<ClaimVerificationViewProps> = ({
   // Batch selection helpers
   const selectAll = () => {
     if (!claimsData) return;
-    const next = new Set(claimsData.claims.map((c) => c.id));
-    setSelectedClaimIds(next);
+    setSelectedClaimIds(new Set(claimsData.claims.map((c) => c.id)));
   };
 
   const selectAtomicOnly = () => {
     if (!claimsData) return;
-    const next = new Set(claimsData.claims.filter((c) => c.is_atomic).map((c) => c.id));
-    setSelectedClaimIds(next);
+    setSelectedClaimIds(new Set(claimsData.claims.filter((c) => c.is_atomic).map((c) => c.id)));
   };
 
   const selectNumericalOnly = () => {
     if (!claimsData) return;
-    const next = new Set(
-      claimsData.claims
-        .filter((c) => c.category === "numerical")
-        .map((c) => c.id)
+    setSelectedClaimIds(
+      new Set(claimsData.claims.filter((c) => c.category === "numerical").map((c) => c.id))
     );
-    setSelectedClaimIds(next);
   };
 
   const clearSelection = () => {
@@ -213,6 +299,9 @@ export const ClaimVerificationView: React.FC<ClaimVerificationViewProps> = ({
   const filteredClaims = useMemo(() => {
     if (!claimsData) return [];
     return claimsData.claims.filter((c) => {
+      const ver = verifications[c.id];
+      const verdict = ver ? ver.verdict : "Unverified";
+
       // Search
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
@@ -228,6 +317,12 @@ export const ClaimVerificationView: React.FC<ClaimVerificationViewProps> = ({
       if (atomicityFilter === "atomic" && !c.is_atomic) return false;
       if (atomicityFilter === "compound" && c.is_atomic) return false;
 
+      // Verdict Filter
+      if (verdictFilter !== "all") {
+        if (verdictFilter === "Unverified" && ver) return false;
+        if (verdictFilter !== "Unverified" && verdict !== verdictFilter) return false;
+      }
+
       // Active sentence highlight filter if clicked
       if (activeSentenceKey) {
         const [pIdxStr, sIdxStr] = activeSentenceKey.split("-");
@@ -241,7 +336,7 @@ export const ClaimVerificationView: React.FC<ClaimVerificationViewProps> = ({
 
       return true;
     });
-  }, [claimsData, searchQuery, categoryFilter, atomicityFilter, activeSentenceKey]);
+  }, [claimsData, searchQuery, categoryFilter, atomicityFilter, verdictFilter, activeSentenceKey, verifications]);
 
   // Color mapping for claim categories
   const getCategoryBadgeClass = (category: ClaimCategory | string) => {
@@ -267,6 +362,40 @@ export const ClaimVerificationView: React.FC<ClaimVerificationViewProps> = ({
     }
   };
 
+  // Verdict badge renderer
+  const renderVerdictBadge = (verdict?: EvidenceVerdict | string) => {
+    switch (verdict) {
+      case "Supported":
+        return (
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1 shadow-sm">
+            <ShieldCheck className="w-3 h-3 text-emerald-400" />
+            <span>Supported</span>
+          </span>
+        );
+      case "Contradicted":
+        return (
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 flex items-center gap-1 shadow-sm">
+            <ShieldAlert className="w-3 h-3 text-rose-400" />
+            <span>Contradicted</span>
+          </span>
+        );
+      case "Unresolved":
+        return (
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1 shadow-sm">
+            <ShieldQuestion className="w-3 h-3 text-amber-400" />
+            <span>Unresolved</span>
+          </span>
+        );
+      default:
+        return (
+          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 flex items-center gap-1">
+            <HelpCircle className="w-3 h-3" />
+            <span>Unverified</span>
+          </span>
+        );
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-950 text-slate-100">
       {/* Top Header & Breadcrumb */}
@@ -274,21 +403,30 @@ export const ClaimVerificationView: React.FC<ClaimVerificationViewProps> = ({
         <div>
           <div className="flex items-center gap-2 text-xs font-mono text-cyan-400 tracking-wider uppercase mb-1">
             <Layers className="w-3.5 h-3.5" />
-            <span>VERITAS Phase 6 · Claim Verification Center</span>
+            <span>VERITAS Phase 7 · Hybrid Evidence Retrieval & Verification Engine</span>
           </div>
           <h1 className="text-xl font-bold text-white flex items-center gap-2">
-            <span>Atomic Claim Decomposition</span>
-            <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-950/80 text-cyan-300 border border-cyan-800/60">
-              Provenance Intact
+            <span>Claim Verification Center</span>
+            <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-950/80 text-emerald-300 border border-emerald-800/60 font-semibold">
+              Tri-State Evidence Core
             </span>
           </h1>
           <p className="text-xs text-slate-400 mt-0.5">
-            Decompose academic syntheses into atomic, independently verifiable propositions while preserving sentence order.
+            Retrieve source passages using Hybrid RRF, validate verbatim quotations, and determine Supported, Contradicted, or Unresolved verdicts.
           </p>
         </div>
 
-        {/* Project Selector */}
+        {/* Project Selector & Faithfulness Pill */}
         <div className="flex items-center gap-3">
+          {verificationSummary && verificationSummary.verified_claims > 0 && (
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs font-mono">
+              <span className="text-slate-400">Faithfulness:</span>
+              <strong className="text-emerald-400 font-bold">
+                {(verificationSummary.faithfulness_rate * 100).toFixed(1)}%
+              </strong>
+            </div>
+          )}
+
           <label className="text-xs text-slate-400 font-medium">Project Scope:</label>
           <select
             value={selectedProjectId}
@@ -356,6 +494,26 @@ export const ClaimVerificationView: React.FC<ClaimVerificationViewProps> = ({
                 <span>{isLoading ? "Decomposing..." : "Decompose into Atomic Claims"}</span>
               </button>
 
+              {/* Batch Verification Trigger */}
+              {claimsData && (
+                <button
+                  onClick={handleVerifySelected}
+                  disabled={isVerifying || selectedClaimIds.size === 0}
+                  className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-all shadow-md disabled:opacity-50"
+                >
+                  {isVerifying ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <ShieldCheck className="w-4 h-4" />
+                  )}
+                  <span>
+                    {isVerifying
+                      ? "Retrieving & Verifying..."
+                      : `Verify Selected (${selectedClaimIds.size})`}
+                  </span>
+                </button>
+              )}
+
               {claimsData && (
                 <button
                   onClick={() => handleDecompose(true)}
@@ -412,38 +570,44 @@ export const ClaimVerificationView: React.FC<ClaimVerificationViewProps> = ({
           )}
         </div>
 
-        {/* Statistics Bar (Visible when claims exist) */}
+        {/* Statistics & Verdict Breakdown Bar */}
         {claimsData && (
           <div className="bg-slate-900/60 border border-slate-800 rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-4">
             <div className="flex flex-wrap items-center gap-4 text-xs font-mono">
-              <div className="flex items-center gap-1.5 text-slate-300">
-                <FileText className="w-3.5 h-3.5 text-slate-400" />
-                <span>{claimsData.total_paragraphs} Paragraphs</span>
-              </div>
-              <div className="h-3 w-px bg-slate-800" />
-              <div className="flex items-center gap-1.5 text-slate-300">
-                <Hash className="w-3.5 h-3.5 text-slate-400" />
-                <span>{claimsData.total_sentences} Sentences</span>
-              </div>
-              <div className="h-3 w-px bg-slate-800" />
               <div className="flex items-center gap-1.5 text-cyan-400 font-bold">
                 <Layers className="w-3.5 h-3.5" />
-                <span>{claimsData.total_claims} Extracted Claims</span>
+                <span>{claimsData.total_claims} Claims</span>
               </div>
               <div className="h-3 w-px bg-slate-800" />
-              <div className="flex items-center gap-1.5 text-emerald-400">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>{claimsData.atomic_claims_count} Atomic</span>
+
+              {/* Supported count */}
+              <div className="flex items-center gap-1.5 text-emerald-400 font-semibold">
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>
+                  {Object.values(verifications).filter((v) => v.verdict === "Supported").length}{" "}
+                  Supported
+                </span>
               </div>
-              {claimsData.compound_claims_count > 0 && (
-                <>
-                  <div className="h-3 w-px bg-slate-800" />
-                  <div className="flex items-center gap-1.5 text-amber-400">
-                    <AlertTriangle className="w-3.5 h-3.5" />
-                    <span>{claimsData.compound_claims_count} Compound / Mixed</span>
-                  </div>
-                </>
-              )}
+              <div className="h-3 w-px bg-slate-800" />
+
+              {/* Contradicted count */}
+              <div className="flex items-center gap-1.5 text-rose-400 font-semibold">
+                <ShieldAlert className="w-3.5 h-3.5" />
+                <span>
+                  {Object.values(verifications).filter((v) => v.verdict === "Contradicted").length}{" "}
+                  Contradicted
+                </span>
+              </div>
+              <div className="h-3 w-px bg-slate-800" />
+
+              {/* Unresolved count */}
+              <div className="flex items-center gap-1.5 text-amber-400 font-semibold">
+                <ShieldQuestion className="w-3.5 h-3.5" />
+                <span>
+                  {Object.values(verifications).filter((v) => v.verdict === "Unresolved").length}{" "}
+                  Unresolved
+                </span>
+              </div>
             </div>
 
             {/* View Mode Switcher */}
@@ -501,6 +665,19 @@ export const ClaimVerificationView: React.FC<ClaimVerificationViewProps> = ({
                 />
               </div>
 
+              {/* Verdict filter dropdown */}
+              <select
+                value={verdictFilter}
+                onChange={(e) => setVerdictFilter(e.target.value)}
+                className="bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-300 focus:outline-none focus:ring-1 focus:ring-cyan-500 text-xs font-medium"
+              >
+                <option value="all">All Verdicts</option>
+                <option value="Supported">Supported</option>
+                <option value="Contradicted">Contradicted</option>
+                <option value="Unresolved">Unresolved</option>
+                <option value="Unverified">Unverified Only</option>
+              </select>
+
               {/* Category dropdown */}
               <select
                 value={categoryFilter}
@@ -517,17 +694,6 @@ export const ClaimVerificationView: React.FC<ClaimVerificationViewProps> = ({
                 <option value="limitation">Limitation</option>
                 <option value="descriptive_factual">Descriptive</option>
                 <option value="mixed">Mixed</option>
-              </select>
-
-              {/* Atomicity dropdown */}
-              <select
-                value={atomicityFilter}
-                onChange={(e) => setAtomicityFilter(e.target.value)}
-                className="bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-300 focus:outline-none focus:ring-1 focus:ring-cyan-500 text-xs"
-              >
-                <option value="all">All Atomicity</option>
-                <option value="atomic">Atomic Only</option>
-                <option value="compound">Compound / Mixed</option>
               </select>
 
               {activeSentenceKey && (
@@ -638,7 +804,7 @@ export const ClaimVerificationView: React.FC<ClaimVerificationViewProps> = ({
               </div>
             )}
 
-            {/* Right Pane: Extracted Claims Feed */}
+            {/* Right Pane: Extracted Claims Feed with Verdict Badges */}
             {(viewMode === "split" || viewMode === "claims") && (
               <div
                 className={`${
@@ -653,7 +819,7 @@ export const ClaimVerificationView: React.FC<ClaimVerificationViewProps> = ({
                     </span>
                   </div>
                   <span className="text-[11px] text-slate-400">
-                    Ordered strictly by source narrative position
+                    Tri-State Verification Grounded in Retrieved Passages
                   </span>
                 </div>
 
@@ -665,6 +831,9 @@ export const ClaimVerificationView: React.FC<ClaimVerificationViewProps> = ({
                   ) : (
                     filteredClaims.map((claim) => {
                       const isSelected = selectedClaimIds.has(claim.id);
+                      const ver = verifications[claim.id];
+                      const isCurrentlyVerifying = verifyingClaimId === claim.id;
+
                       return (
                         <div
                           key={claim.id}
@@ -674,7 +843,7 @@ export const ClaimVerificationView: React.FC<ClaimVerificationViewProps> = ({
                               : "bg-slate-950/70 border-slate-800/80 hover:border-slate-700"
                           }`}
                         >
-                          {/* Card Header: Checkbox + Meta Tags */}
+                          {/* Card Header: Checkbox + Meta Tags + Verdict */}
                           <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-2.5">
                               <button
@@ -693,19 +862,6 @@ export const ClaimVerificationView: React.FC<ClaimVerificationViewProps> = ({
                                 P{claim.paragraph_index + 1} · S{claim.sentence_index + 1} · C{claim.claim_index + 1}
                               </span>
 
-                              {/* Atomicity Badge */}
-                              {claim.is_atomic ? (
-                                <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
-                                  <CheckCircle2 className="w-2.5 h-2.5" />
-                                  <span>Atomic</span>
-                                </span>
-                              ) : (
-                                <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 flex items-center gap-1">
-                                  <AlertTriangle className="w-2.5 h-2.5" />
-                                  <span>Compound / Mixed</span>
-                                </span>
-                              )}
-
                               {/* Category Badge */}
                               <span
                                 className={`text-[10px] font-medium px-2 py-0.5 rounded-full border uppercase tracking-wider ${getCategoryBadgeClass(
@@ -714,16 +870,41 @@ export const ClaimVerificationView: React.FC<ClaimVerificationViewProps> = ({
                               >
                                 {claim.category}
                               </span>
+
+                              {/* Verdict Badge */}
+                              {renderVerdictBadge(ver?.verdict)}
                             </div>
 
-                            {/* Inspector Button */}
-                            <button
-                              onClick={() => setActiveClaim(claim)}
-                              className="text-xs text-slate-400 hover:text-cyan-300 flex items-center gap-1 transition-colors px-2 py-0.5 rounded hover:bg-slate-800"
-                            >
-                              <span>Inspect</span>
-                              <ChevronRight className="w-3.5 h-3.5" />
-                            </button>
+                            {/* Verification Actions */}
+                            <div className="flex items-center gap-1.5">
+                              {!ver && (
+                                <button
+                                  onClick={() => handleVerifySingle(claim.id)}
+                                  disabled={isCurrentlyVerifying}
+                                  className="text-[11px] font-medium px-2.5 py-1 rounded bg-slate-800 hover:bg-emerald-950/60 hover:text-emerald-300 border border-slate-700 text-slate-300 flex items-center gap-1 transition-all disabled:opacity-50"
+                                >
+                                  {isCurrentlyVerifying ? (
+                                    <RefreshCw className="w-3 h-3 animate-spin" />
+                                  ) : (
+                                    <ShieldCheck className="w-3 h-3" />
+                                  )}
+                                  <span>{isCurrentlyVerifying ? "Verifying..." : "Verify"}</span>
+                                </button>
+                              )}
+
+                              {ver && (
+                                <button
+                                  onClick={() => {
+                                    setActiveClaim(claim);
+                                    setActiveVerification(ver);
+                                  }}
+                                  className="text-[11px] font-semibold px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-cyan-300 flex items-center gap-1 border border-slate-700 transition-colors"
+                                >
+                                  <span>Evidence ({ver.cited_evidence.length})</span>
+                                  <ChevronRight className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
                           </div>
 
                           {/* Normalized Proposition Text */}
@@ -731,15 +912,13 @@ export const ClaimVerificationView: React.FC<ClaimVerificationViewProps> = ({
                             {claim.normalized_text}
                           </div>
 
-                          {/* Original context & notes footer */}
-                          <div className="pl-6 pt-1 border-t border-slate-800/60 flex flex-wrap items-center justify-between text-[11px] text-slate-400 gap-2">
-                            <span className="italic truncate max-w-sm">
-                              &ldquo;{claim.original_text}&rdquo;
-                            </span>
-                            <span className="text-[10px] font-mono text-slate-500">
-                              Status: <span className="text-slate-300">Ready for Verification</span>
-                            </span>
-                          </div>
+                          {/* Reasoning teaser if verified */}
+                          {ver && (
+                            <div className="pl-6 pt-1 text-[11px] text-slate-400 border-t border-slate-800/60 flex items-start gap-2">
+                              <span className="font-semibold text-slate-300 shrink-0">Verdict Reasoning:</span>
+                              <span className="italic truncate">{ver.reasoning}</span>
+                            </div>
+                          )}
                         </div>
                       );
                     })
@@ -755,12 +934,10 @@ export const ClaimVerificationView: React.FC<ClaimVerificationViewProps> = ({
               <Layers className="w-7 h-7" />
             </div>
             <h3 className="text-base font-bold text-white mb-1">
-              Ready to Decompose Research Claims
+              Claim Verification & Evidence Retrieval Engine
             </h3>
             <p className="text-xs text-slate-400 max-w-md mb-6 leading-relaxed">
-              Select a research summary or cross-paper synthesis from your project, or paste
-              academic text above. VERITAS will isolate compound statements into individually
-              testable propositions with sentence-level provenance.
+              Select an output above and click &ldquo;Decompose into Atomic Claims&rdquo;. VERITAS will split compound propositions, run hybrid lexical and vector retrieval across source papers, and verify claims with verbatim quotation integrity.
             </p>
             <button
               onClick={() => handleDecompose(false)}
@@ -774,99 +951,198 @@ export const ClaimVerificationView: React.FC<ClaimVerificationViewProps> = ({
         )}
       </div>
 
-      {/* Claim Detail Modal Inspector */}
-      {activeClaim && (
+      {/* Verification Evidence Inspector Drawer / Modal */}
+      {(activeClaim || activeVerification) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 shadow-2xl flex flex-col gap-4 text-slate-100 max-h-[90vh] overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-3xl w-full p-6 shadow-2xl flex flex-col gap-4 text-slate-100 max-h-[90vh] overflow-y-auto">
             <div className="flex items-start justify-between border-b border-slate-800 pb-3">
               <div>
                 <div className="flex items-center gap-2 text-xs font-mono text-cyan-400 mb-1">
-                  <span>PROPOSITION INSPECTOR</span>
-                  <span>·</span>
-                  <span className="text-slate-400">ID: {activeClaim.id.slice(0, 8)}...</span>
+                  <span>EVIDENCE VERIFICATION INSPECTOR</span>
+                  {activeVerification && (
+                    <>
+                      <span>·</span>
+                      <span className="text-slate-400">Model: {activeVerification.model_name}</span>
+                    </>
+                  )}
                 </div>
-                <h3 className="text-base font-bold text-white">
-                  Atomic Proposition Breakdown
+                <h3 className="text-base font-bold text-white flex items-center gap-2.5">
+                  <span>Atomic Proposition Verification</span>
+                  {activeVerification && renderVerdictBadge(activeVerification.verdict)}
                 </h3>
               </div>
               <button
-                onClick={() => setActiveClaim(null)}
+                onClick={() => {
+                  setActiveClaim(null);
+                  setActiveVerification(null);
+                }}
                 className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
               >
                 ✕
               </button>
             </div>
 
+            {/* Downgrade Alert Banner (Step 7) */}
+            {activeVerification?.downgraded && (
+              <div className="bg-amber-950/60 border border-amber-600/70 rounded-xl p-3.5 text-xs text-amber-200 flex items-start gap-2.5 shadow-sm">
+                <AlertTriangle className="w-4 h-4 shrink-0 text-amber-400 mt-0.5" />
+                <div>
+                  <strong className="font-bold text-amber-300 block mb-0.5">
+                    Strict Evidence Harness: Verdict Downgraded to Unresolved
+                  </strong>
+                  <span>{activeVerification.downgrade_reason}</span>
+                </div>
+              </div>
+            )}
+
             {/* Normalized Proposition */}
-            <div className="space-y-1.5 bg-slate-950 p-4 rounded-xl border border-slate-800">
+            <div className="space-y-1 bg-slate-950 p-4 rounded-xl border border-slate-800">
               <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block">
-                Normalized Atomic Statement
+                Normalized Proposition
               </span>
               <p className="text-sm font-semibold text-cyan-200">
-                {activeClaim.normalized_text}
+                {activeClaim?.normalized_text || activeVerification?.claim_text}
               </p>
             </div>
 
-            {/* Original Sentence */}
-            <div className="space-y-1.5 bg-slate-950/60 p-4 rounded-xl border border-slate-800/80">
-              <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block">
-                Original Sentence in Source Narrative
-              </span>
-              <p className="text-xs font-serif italic text-slate-300">
-                &ldquo;{activeClaim.original_text}&rdquo;
-              </p>
-            </div>
+            {/* Verification Reasoning */}
+            {activeVerification && (
+              <div className="space-y-1 bg-slate-950/70 p-4 rounded-xl border border-slate-800/80">
+                <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block">
+                  Evidence-Grounded Reasoning
+                </span>
+                <p className="text-xs text-slate-300 leading-relaxed font-sans">
+                  {activeVerification.reasoning}
+                </p>
+              </div>
+            )}
 
-            {/* Key Metadata Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-              <div className="bg-slate-950/40 p-3 rounded-lg border border-slate-800/60">
-                <span className="text-[10px] text-slate-400 block font-mono">Category</span>
-                <span className={`font-semibold capitalize text-xs mt-0.5 inline-block`}>
-                  {activeClaim.category}
-                </span>
+            {/* Key Assessment Indicators */}
+            {activeVerification && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                <div className="bg-slate-950/40 p-3 rounded-lg border border-slate-800/60">
+                  <span className="text-[10px] text-slate-400 block font-mono">Evidence Strength</span>
+                  <span className="font-semibold text-xs mt-0.5 inline-block text-cyan-300">
+                    {activeVerification.evidence_strength}
+                  </span>
+                </div>
+                <div className="bg-slate-950/40 p-3 rounded-lg border border-slate-800/60">
+                  <span className="text-[10px] text-slate-400 block font-mono">Retrieved Passages</span>
+                  <span className="font-semibold text-xs mt-0.5 inline-block font-mono text-slate-200">
+                    {activeVerification.retrieved_passages_count} Candidates
+                  </span>
+                </div>
+                <div className="bg-slate-950/40 p-3 rounded-lg border border-slate-800/60">
+                  <span className="text-[10px] text-slate-400 block font-mono">Numerical Match</span>
+                  <span className="font-semibold text-xs mt-0.5 inline-block">
+                    {activeVerification.numerical_check_passed === true ? (
+                      <span className="text-emerald-400 flex items-center gap-1">
+                        <Check className="w-3 h-3" /> Exact Figure
+                      </span>
+                    ) : activeVerification.numerical_check_passed === false ? (
+                      <span className="text-rose-400 flex items-center gap-1">
+                        <X className="w-3 h-3" /> Discrepancy
+                      </span>
+                    ) : (
+                      <span className="text-slate-400">N/A (Non-numerical)</span>
+                    )}
+                  </span>
+                </div>
+                <div className="bg-slate-950/40 p-3 rounded-lg border border-slate-800/60">
+                  <span className="text-[10px] text-slate-400 block font-mono">Integrity Status</span>
+                  <span className="font-semibold text-xs mt-0.5 inline-block text-emerald-400 flex items-center gap-1">
+                    <ShieldCheck className="w-3 h-3" /> Verified Verbatim
+                  </span>
+                </div>
               </div>
-              <div className="bg-slate-950/40 p-3 rounded-lg border border-slate-800/60">
-                <span className="text-[10px] text-slate-400 block font-mono">Atomicity</span>
-                <span className="font-semibold text-xs mt-0.5 inline-block text-emerald-300">
-                  {activeClaim.is_atomic ? "Atomic" : "Compound"}
-                </span>
-              </div>
-              <div className="bg-slate-950/40 p-3 rounded-lg border border-slate-800/60">
-                <span className="text-[10px] text-slate-400 block font-mono">Position</span>
-                <span className="font-semibold text-xs mt-0.5 inline-block font-mono text-cyan-300">
-                  P{activeClaim.paragraph_index + 1} · S{activeClaim.sentence_index + 1} · C{activeClaim.claim_index + 1}
-                </span>
-              </div>
-              <div className="bg-slate-950/40 p-3 rounded-lg border border-slate-800/60">
-                <span className="text-[10px] text-slate-400 block font-mono">Confidence</span>
-                <span className="font-semibold text-xs mt-0.5 inline-block font-mono text-slate-200">
-                  {(activeClaim.confidence_score * 100).toFixed(0)}%
-                </span>
-              </div>
-            </div>
+            )}
 
-            {/* Decomposition Rationale & Notes */}
-            {activeClaim.decomposition_notes && (
+            {/* Cited Source Passages */}
+            {activeVerification && activeVerification.cited_evidence.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                    Cited Evidence Passages ({activeVerification.cited_evidence.length})
+                  </span>
+                  <span className="text-[10px] text-slate-500">
+                    Grounded in physical PDF page numbers
+                  </span>
+                </div>
+
+                <div className="space-y-2.5 max-h-60 overflow-y-auto">
+                  {activeVerification.cited_evidence.map((cite, idx) => (
+                    <div
+                      key={cite.passage_id || idx}
+                      className="p-3 bg-slate-950 rounded-lg border border-slate-800 flex flex-col gap-2"
+                    >
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-cyan-400 text-[11px]">
+                            Page {cite.page_number} · Section: {cite.section_title}
+                          </span>
+                          {cite.is_quote_valid && (
+                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1">
+                              <Check className="w-2.5 h-2.5" /> Verbatim Quote Verified
+                            </span>
+                          )}
+                          {cite.semantic_entailment && (
+                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
+                              Logical Entailment
+                            </span>
+                          )}
+                        </div>
+
+                        <button
+                          onClick={() => handleOpenPdf(cite.paper_id, cite.page_number)}
+                          className="text-[11px] text-cyan-400 hover:text-cyan-300 flex items-center gap-1 transition-colors"
+                        >
+                          <span>Open PDF</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </button>
+                      </div>
+
+                      <div className="text-xs font-serif italic text-slate-300 pl-3 border-l-2 border-cyan-500/60 bg-slate-900/40 p-2 rounded-r">
+                        &ldquo;{cite.exact_quote}&rdquo;
+                      </div>
+
+                      {cite.explanation && (
+                        <div className="text-[11px] text-slate-400 font-sans">
+                          <span className="text-slate-300 font-medium">Relevance:</span> {cite.explanation}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Limitations & Caveats */}
+            {activeVerification && activeVerification.limitations.length > 0 && (
               <div className="bg-slate-950/50 p-3 rounded-lg border border-slate-800 text-xs">
-                <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block mb-1">
-                  Decomposition Notes
+                <span className="text-[10px] font-mono text-amber-400 uppercase tracking-wider block mb-1">
+                  Contextual Limitations & Uncertainties
                 </span>
-                <p className="text-slate-300">{activeClaim.decomposition_notes}</p>
+                <ul className="list-disc list-inside space-y-1 text-slate-300">
+                  {activeVerification.limitations.map((lim, i) => (
+                    <li key={i}>{lim}</li>
+                  ))}
+                </ul>
               </div>
             )}
 
             {/* Modal Actions */}
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+            <div className="flex items-center justify-between pt-2 border-t border-slate-800 text-xs">
+              <span className="text-slate-500 font-mono text-[10px]">
+                Algorithm: Hybrid BM25 + Vector RRF (k=60)
+              </span>
               <button
                 onClick={() => {
-                  toggleClaimSelection(activeClaim.id);
                   setActiveClaim(null);
+                  setActiveVerification(null);
                 }}
-                className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-semibold transition-colors"
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold transition-colors"
               >
-                {selectedClaimIds.has(activeClaim.id)
-                  ? "Deselect Claim"
-                  : "Select Claim for Verification"}
+                Close Inspector
               </button>
             </div>
           </div>
@@ -875,4 +1151,3 @@ export const ClaimVerificationView: React.FC<ClaimVerificationViewProps> = ({
     </div>
   );
 };
-
