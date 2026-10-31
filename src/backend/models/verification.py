@@ -99,3 +99,4 @@ class ProjectVerificationSummary(BaseModel):
     unresolved_count: int
     unverified_count: int
     faithfulness_rate: float
+

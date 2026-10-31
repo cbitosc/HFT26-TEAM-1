@@ -106,3 +106,4 @@ def get_project_verification_summary(project_id: str):
         raise HTTPException(status_code=404, detail=f"Research project '{project_id}' not found.")
 
     return ClaimVerifierService.get_project_summary(project_id)
+
