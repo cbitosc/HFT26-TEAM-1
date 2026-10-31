@@ -558,5 +558,136 @@ export interface PdfAccessResponse {
   file_size_bytes: number;
 }
 
+// =============================================================================
+// PHASE 9: ADVANCED RESEARCH AUDIT TYPES
+// =============================================================================
+
+export type NumericalVerdict =
+  | 'Numerically consistent'
+  | 'Numerical discrepancy'
+  | 'Context mismatch'
+  | 'Insufficient numerical evidence';
+
+export interface NumericalExpression {
+  value: number;
+  raw_str: string;
+  unit?: string | null;
+  metric?: string | null;
+  dataset?: string | null;
+  baseline_value?: number | null;
+  direction?: string | null;
+  is_percentage: boolean;
+  is_percentage_points: boolean;
+}
+
+export interface NumericalAuditResult {
+  claim_id: string;
+  claim_text: string;
+  verdict: NumericalVerdict;
+  claimed_expression?: NumericalExpression | null;
+  source_reported_expression?: NumericalExpression | null;
+  calculation_explanation: string;
+  relative_change_calc?: string | null;
+  percentage_point_calc?: string | null;
+  unit_match: boolean;
+  metric_match: boolean;
+  dataset_match: boolean;
+  direction_match: boolean;
+  passage_id?: string | null;
+  exact_quote?: string | null;
+}
+
+export type OvergeneralizationType =
+  | 'Dataset overreach (single benchmark generalized to all datasets)'
+  | 'Sample size overreach (small sample generalized to large population)'
+  | 'Correlation presented as definitive causation'
+  | 'Conditional/synthetic finding presented as universal fact'
+  | 'Benchmark metric proxy treated as real-world proof'
+  | 'Narrow finding stated without author\'s explicit limitations'
+  | 'Appropriately scoped (no overgeneralization detected)';
+
+export interface OvergeneralizationAuditResult {
+  claim_id: string;
+  claim_text: string;
+  is_overgeneralized: boolean;
+  flagged_type: OvergeneralizationType;
+  evidence_supported_scope: string;
+  explanation: string;
+  suggested_narrower_wording: string;
+  requires_human_review: boolean;
+  passage_id?: string | null;
+  exact_quote?: string | null;
+}
+
+export type GapOriginType =
+  | 'Author-identified future work'
+  | 'VERITAS-synthesized research direction';
+
+export interface ResearchGapItem {
+  id: string;
+  project_id: string;
+  suggested_research_question: string;
+  supporting_limitations: string[];
+  source_paper_ids: string[];
+  source_paper_titles: string[];
+  source_passage_ids: string[];
+  explanation: string;
+  origin_type: GapOriginType;
+  important_uncertainties: string[];
+  feasibility_notes: string;
+  created_at: string;
+}
+
+export interface GenerateGapsRequest {
+  project_id: string;
+  paper_ids?: string[];
+  focus_area?: string;
+}
+
+export interface ProjectGapsResponse {
+  project_id: string;
+  total_gaps: number;
+  author_identified_count: number;
+  veritas_synthesized_count: number;
+  gaps: ResearchGapItem[];
+}
+
+export type LedgerEventType =
+  | 'PAPER_UPLOAD'
+  | 'PAPER_PROCESSING'
+  | 'INTELLIGENCE_EXTRACTION'
+  | 'SUMMARY_GENERATION'
+  | 'SYNTHESIS_GENERATION'
+  | 'CLAIM_DECOMPOSITION'
+  | 'EVIDENCE_RETRIEVAL'
+  | 'CLAIM_VERIFICATION'
+  | 'NUMERICAL_AUDIT'
+  | 'OVERGENERALIZATION_AUDIT'
+  | 'RESEARCH_GAP_GENERATION'
+  | 'USER_REGENERATION';
+
+export interface ProvenanceLedgerEntry {
+  id: string;
+  project_id: string;
+  event_type: LedgerEventType;
+  entity_id: string;
+  title: string;
+  description: string;
+  actor: string;
+  model_name?: string | null;
+  prompt_version?: string | null;
+  retrieval_version?: string | null;
+  validation_outcome: string;
+  metadata_json: Record<string, any>;
+  created_at: string;
+}
+
+export interface ProjectLedgerResponse {
+  project_id: string;
+  total_events: number;
+  events: ProvenanceLedgerEntry[];
+}
+
+
 
 

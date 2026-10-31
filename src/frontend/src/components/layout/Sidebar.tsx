@@ -43,22 +43,22 @@ const NAV_ITEMS: { category: string; items: NavItem[] }[] = [
   {
     category: "AUDIT & INTELLIGENCE",
     items: [
-      { id: "intelligence", label: "Paper Intelligence", icon: BrainCircuit, badge: "Phase 2", isImplemented: false },
-      { id: "summaries", label: "Research Summaries", icon: ScrollText, badge: "Phase 3", isImplemented: false },
-      { id: "synthesis", label: "Cross-Paper Synthesis", icon: GitMerge, badge: "Phase 3", isImplemented: false },
-      { id: "claims", label: "Claim Verification", icon: ShieldCheck, badge: "Phase 4", isImplemented: false },
-      { id: "evidence", label: "Evidence Explorer", icon: SearchCode, badge: "Phase 4", isImplemented: false },
-      { id: "matrix", label: "Comparison Matrix", icon: TableProperties, badge: "Phase 4", isImplemented: false },
-      { id: "gaps", label: "Research Gap Explorer", icon: Compass, badge: "Phase 5", isImplemented: false },
-      { id: "numerical", label: "Numerical Truth Detector", icon: Binary, badge: "Phase 5", isImplemented: false },
+      { id: "intelligence", label: "Paper Intelligence", icon: BrainCircuit, isImplemented: true },
+      { id: "summaries", label: "Research Summaries", icon: ScrollText, isImplemented: true },
+      { id: "synthesis", label: "Cross-Paper Synthesis", icon: GitMerge, isImplemented: true },
+      { id: "claims", label: "Claim Verification", icon: ShieldCheck, isImplemented: true },
+      { id: "evidence", label: "Evidence Explorer", icon: SearchCode, isImplemented: true },
+      { id: "matrix", label: "Comparison Matrix", icon: TableProperties, isImplemented: true },
+      { id: "gaps", label: "Research Gap Explorer", icon: Compass, isImplemented: true },
+      { id: "numerical", label: "Numerical Truth Detector", icon: Binary, isImplemented: true },
     ]
   },
   {
     category: "VALIDATION & EXPORT",
     items: [
-      { id: "benchmarks", label: "Evaluation & Benchmarks", icon: Target, badge: "Phase 6", isImplemented: false },
-      { id: "provenance", label: "Provenance Ledger", icon: FileClock, badge: "Phase 6", isImplemented: false },
-      { id: "audit", label: "Export & Audit Reports", icon: DownloadCloud, badge: "Phase 6", isImplemented: false },
+      { id: "benchmarks", label: "Evaluation & Benchmarks", icon: Target, badge: "Phase 10", isImplemented: false },
+      { id: "provenance", label: "Provenance Ledger", icon: FileClock, isImplemented: true },
+      { id: "audit", label: "Export & Audit Reports", icon: DownloadCloud, badge: "Phase 10", isImplemented: false },
       { id: "settings", label: "Settings", icon: Settings, isImplemented: true },
     ]
   }

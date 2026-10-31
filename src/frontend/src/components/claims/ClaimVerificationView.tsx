@@ -12,7 +12,9 @@ import {
   EvidenceVerdict,
   ClaimVerificationResult,
   ProjectVerificationSummary,
-  CitedEvidencePassage
+  CitedEvidencePassage,
+  NumericalAuditResult,
+  OvergeneralizationAuditResult
 } from "../../types";
 import {
   fetchProjects,
@@ -23,7 +25,9 @@ import {
   verifyClaim,
   verifyBatchClaims,
   fetchProjectVerificationSummary,
-  fetchSignedUrl
+  fetchSignedUrl,
+  auditNumericalClaim,
+  auditOvergeneralization
 } from "../../lib/api";
 import {
   CheckCircle2,
@@ -53,7 +57,8 @@ import {
   ShieldQuestion,
   BarChart3,
   Check,
-  X
+  X,
+  Binary
 } from "lucide-react";
 
 interface ClaimVerificationViewProps {
@@ -91,6 +96,12 @@ export const ClaimVerificationView: React.FC<ClaimVerificationViewProps> = ({
   const [selectedClaimIds, setSelectedClaimIds] = useState<Set<string>>(new Set());
   const [activeSentenceKey, setActiveSentenceKey] = useState<string | null>(null); // "p-s"
   const [activeClaim, setActiveClaim] = useState<AtomicClaim | null>(null);
+
+  // Phase 9: Advanced Research Audit State
+  const [auditNumResult, setAuditNumResult] = useState<NumericalAuditResult | null>(null);
+  const [auditOvergenResult, setAuditOvergenResult] = useState<OvergeneralizationAuditResult | null>(null);
+  const [isAuditingNum, setIsAuditingNum] = useState<boolean>(false);
+  const [isAuditingOvergen, setIsAuditingOvergen] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [atomicityFilter, setAtomicityFilter] = useState<string>("all"); // "all" | "atomic" | "compound"
@@ -259,6 +270,33 @@ export const ClaimVerificationView: React.FC<ClaimVerificationViewProps> = ({
       window.open(urlWithPage, "_blank");
     } catch (err: any) {
       alert("Unable to open private PDF: " + (err.message || "Unknown error"));
+    }
+  };
+
+  // Phase 9: Numerical Truth and Overgeneralization Audits
+  const handleAuditNumerics = async () => {
+    if (!activeClaim || !selectedProjectId) return;
+    setIsAuditingNum(true);
+    try {
+      const res = await auditNumericalClaim(activeClaim.id, selectedProjectId);
+      setAuditNumResult(res);
+    } catch (err: any) {
+      alert("Numerical truth audit error: " + (err.message || "Unknown error"));
+    } finally {
+      setIsAuditingNum(false);
+    }
+  };
+
+  const handleAuditOvergeneralization = async () => {
+    if (!activeClaim || !selectedProjectId) return;
+    setIsAuditingOvergen(true);
+    try {
+      const res = await auditOvergeneralization(activeClaim.id, selectedProjectId);
+      setAuditOvergenResult(res);
+    } catch (err: any) {
+      alert("Scope audit error: " + (err.message || "Unknown error"));
+    } finally {
+      setIsAuditingOvergen(false);
     }
   };
 
@@ -897,6 +935,8 @@ export const ClaimVerificationView: React.FC<ClaimVerificationViewProps> = ({
                                   onClick={() => {
                                     setActiveClaim(claim);
                                     setActiveVerification(ver);
+                                    setAuditNumResult(null);
+                                    setAuditOvergenResult(null);
                                   }}
                                   className="text-[11px] font-semibold px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-cyan-300 flex items-center gap-1 border border-slate-700 transition-colors"
                                 >
@@ -1129,6 +1169,84 @@ export const ClaimVerificationView: React.FC<ClaimVerificationViewProps> = ({
                 </ul>
               </div>
             )}
+
+            {/* Phase 9: Advanced Research Audits (Numerical Truth & Scope Detector) */}
+            <div className="bg-slate-950 p-3.5 rounded-lg border border-slate-800 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono text-cyan-400 uppercase tracking-wider font-bold">
+                  ADVANCED RESEARCH AUDITS (PHASE 9)
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleAuditNumerics}
+                    disabled={isAuditingNum}
+                    className="px-2.5 py-1 rounded bg-blue-900/40 hover:bg-blue-800/60 text-blue-300 border border-blue-700/50 text-[11px] font-medium flex items-center gap-1 transition disabled:opacity-50"
+                  >
+                    <Binary className={`w-3 h-3 ${isAuditingNum ? "animate-spin" : ""}`} />
+                    {isAuditingNum ? "Auditing Numerics..." : "Audit Numerics"}
+                  </button>
+                  <button
+                    onClick={handleAuditOvergeneralization}
+                    disabled={isAuditingOvergen}
+                    className="px-2.5 py-1 rounded bg-purple-900/40 hover:bg-purple-800/60 text-purple-300 border border-purple-700/50 text-[11px] font-medium flex items-center gap-1 transition disabled:opacity-50"
+                  >
+                    <ShieldCheck className={`w-3 h-3 ${isAuditingOvergen ? "animate-spin" : ""}`} />
+                    {isAuditingOvergen ? "Auditing Scope..." : "Audit Scope"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Numerical Audit Outcome */}
+              {auditNumResult && (
+                <div className="p-2.5 bg-slate-900/90 rounded border border-slate-800 text-xs space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-slate-200">Numerical Truth Result:</span>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                      auditNumResult.verdict === "Numerically consistent"
+                        ? "bg-emerald-900/50 text-emerald-300 border border-emerald-700/50"
+                        : auditNumResult.verdict === "Numerical discrepancy"
+                        ? "bg-rose-900/50 text-rose-300 border border-rose-700/50"
+                        : "bg-amber-900/50 text-amber-300 border border-amber-700/50"
+                    }`}>
+                      {auditNumResult.verdict}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-300">{auditNumResult.calculation_explanation}</p>
+                  {(auditNumResult.percentage_point_calc || auditNumResult.relative_change_calc) && (
+                    <div className="text-[10px] text-cyan-300 font-mono space-y-0.5 pt-1">
+                      {auditNumResult.percentage_point_calc && <div>• Absolute Diff: {auditNumResult.percentage_point_calc}</div>}
+                      {auditNumResult.relative_change_calc && <div>• Relative Change: {auditNumResult.relative_change_calc}</div>}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Overgeneralization Audit Outcome */}
+              {auditOvergenResult && (
+                <div className="p-2.5 bg-slate-900/90 rounded border border-slate-800 text-xs space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-slate-200">Scope & Generalization:</span>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                      !auditOvergenResult.is_overgeneralized
+                        ? "bg-emerald-900/50 text-emerald-300 border border-emerald-700/50"
+                        : "bg-amber-900/50 text-amber-300 border border-amber-700/50"
+                    }`}>
+                      {!auditOvergenResult.is_overgeneralized ? "Appropriately Scoped" : "Overgeneralization Flagged"}
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-slate-400">
+                    <span className="text-slate-300 font-medium">Type:</span> {auditOvergenResult.flagged_type}
+                  </div>
+                  <p className="text-[11px] text-slate-300">{auditOvergenResult.explanation}</p>
+                  {auditOvergenResult.is_overgeneralized && (
+                    <div className="p-2 bg-emerald-950/40 border border-emerald-800/60 rounded text-[11px] text-emerald-300">
+                      <span className="font-bold block text-emerald-400">Recommended Narrower Wording:</span>
+                      &ldquo;{auditOvergenResult.suggested_narrower_wording}&rdquo;
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
 
             {/* Modal Actions */}
             <div className="flex items-center justify-between pt-2 border-t border-slate-800 text-xs">

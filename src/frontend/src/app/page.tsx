@@ -12,6 +12,9 @@ import { ResearchSummariesView } from "../components/summaries/ResearchSummaries
 import { CrossPaperSynthesisView } from "../components/synthesis/CrossPaperSynthesisView";
 import { ClaimVerificationView } from "../components/claims/ClaimVerificationView";
 import { EvidenceExplorerView } from "../components/evidence/EvidenceExplorerView";
+import { ResearchGapExplorerView } from "../components/gaps/ResearchGapExplorerView";
+import { ProvenanceLedgerView } from "../components/ledger/ProvenanceLedgerView";
+import { NumericalTruthAuditView } from "../components/audit/NumericalTruthAuditView";
 import { PlaceholderView } from "../components/common/PlaceholderView";
 import { SettingsView } from "../components/settings/SettingsView";
 import { CreateProjectModal } from "../components/projects/CreateProjectModal";
@@ -74,30 +77,16 @@ export default function Home() {
         );
       case "gaps":
         return (
-          <PlaceholderView
-            title="Research Gap Explorer"
-            phase="Phase 5"
-            description="Identifies actionable research gap suggestions grounded strictly in author-stated limitations across the ingested paper corpus."
-            features={[
-              "Limitation-grounded gap synthesis",
-              "Hypothesis generation with provenance",
-              "Explicit distinction between fact & suggestion",
-              "Methodological extension recommendations"
-            ]}
+          <ResearchGapExplorerView
+            currentProject={activeProject}
+            onSelectProject={(p) => setActiveProject(p)}
           />
         );
       case "numerical":
         return (
-          <PlaceholderView
-            title="Numerical Truth & Consistency Detector"
-            phase="Phase 5"
-            description="Specialized numeric consistency auditor verifying mathematical statements, percentage points vs relative percentages, and overgeneralization risks."
-            features={[
-              "Decimal-based mathematical auditing",
-              "Baseline & unit mismatch detection",
-              "Percentage vs percentage-point verification",
-              "Overgeneralization score calculation"
-            ]}
+          <NumericalTruthAuditView
+            currentProject={activeProject}
+            onSelectProject={(p) => setActiveProject(p)}
           />
         );
       case "benchmarks":
@@ -116,16 +105,9 @@ export default function Home() {
         );
       case "provenance":
         return (
-          <PlaceholderView
-            title="Evidence Provenance Ledger"
-            phase="Phase 6"
-            description="Immutable audit ledger recording the lineage and verification history of every claim, passage, and synthesis output."
-            features={[
-              "Cryptographic hash validation",
-              "Passage ownership verification",
-              "Tamper-proof audit trails",
-              "Timeline of claim verification"
-            ]}
+          <ProvenanceLedgerView
+            currentProject={activeProject}
+            onSelectProject={(p) => setActiveProject(p)}
           />
         );
       case "audit":

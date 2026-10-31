@@ -5,11 +5,11 @@ from fastapi.responses import JSONResponse
 try:
     from .supabase_client import supabase
     from .config import SUPABASE_URL, SUPABASE_SECRET_KEY
-    from .routes import projects, papers, workspaces, summaries, comparisons, claims, verifications, matrices
+    from .routes import projects, papers, workspaces, summaries, comparisons, claims, verifications, matrices, audits
 except ImportError:
     from supabase_client import supabase
     from config import SUPABASE_URL, SUPABASE_SECRET_KEY
-    from routes import projects, papers, workspaces, summaries, comparisons, claims, verifications, matrices
+    from routes import projects, papers, workspaces, summaries, comparisons, claims, verifications, matrices, audits
 
 app = FastAPI(
     title="VERITAS API",
@@ -34,6 +34,7 @@ app.include_router(comparisons.router)
 app.include_router(claims.router)
 app.include_router(verifications.router)
 app.include_router(matrices.router)
+app.include_router(audits.router)
 
 @app.get("/")
 def root():

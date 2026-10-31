@@ -29,6 +29,20 @@ from .matrix import (
     PassageContextResponse,
     PdfAccessResponse,
 )
+from .audit import (
+    NumericalVerdict,
+    NumericalExpression,
+    NumericalAuditResult,
+    OvergeneralizationType,
+    OvergeneralizationAuditResult,
+    GapOriginType,
+    ResearchGapItem,
+    GenerateGapsRequest,
+    ProjectGapsResponse,
+    LedgerEventType,
+    ProvenanceLedgerEntry,
+    ProjectLedgerResponse,
+)
 
 __all__ = [
     "ClaimCategory",
@@ -55,4 +69,16 @@ __all__ = [
     "GenerateMatrixRequest",
     "PassageContextResponse",
     "PdfAccessResponse",
+    "NumericalVerdict",
+    "NumericalExpression",
+    "NumericalAuditResult",
+    "OvergeneralizationType",
+    "OvergeneralizationAuditResult",
+    "GapOriginType",
+    "ResearchGapItem",
+    "GenerateGapsRequest",
+    "ProjectGapsResponse",
+    "LedgerEventType",
+    "ProvenanceLedgerEntry",
+    "ProjectLedgerResponse",
 ]
