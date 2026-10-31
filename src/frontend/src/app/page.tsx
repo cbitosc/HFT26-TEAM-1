@@ -8,6 +8,7 @@ import { ProjectList } from "../components/projects/ProjectList";
 import { MultiPdfUpload } from "../components/papers/MultiPdfUpload";
 import { ResearchPapersView } from "../components/papers/ResearchPapersView";
 import { PaperIntelligenceView } from "../components/intelligence/PaperIntelligenceView";
+import { ResearchSummariesView } from "../components/summaries/ResearchSummariesView";
 import { PlaceholderView } from "../components/common/PlaceholderView";
 import { SettingsView } from "../components/settings/SettingsView";
 import { CreateProjectModal } from "../components/projects/CreateProjectModal";
@@ -35,16 +36,9 @@ export default function Home() {
         );
       case "summaries":
         return (
-          <PlaceholderView
-            title="Grounded Research Summaries"
-            phase="Phase 3"
-            description="Evidence-first scientific summarization. Every paragraph is linked to source document chunks with verifiable token attribution and quotation checks."
-            features={[
-              "Executive research abstract synthesis",
-              "Methodological comparison summaries",
-              "Zero-hallucination attribution checks",
-              "Exportable structured summaries"
-            ]}
+          <ResearchSummariesView
+            currentProject={activeProject}
+            onSelectProject={(p) => setActiveProject(p)}
           />
         );
       case "synthesis":

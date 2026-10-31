@@ -187,3 +187,56 @@ export interface ProjectIntelligenceSummary {
   extracted_papers: number;
   papers: PaperIntelligence[];
 }
+
+export type SummaryType = 'short' | 'detailed' | 'structured_academic';
+export type StatementRelationship = 'direct_support' | 'cautious_inference' | 'unresolved';
+
+export interface SummaryStatement {
+  id: string;
+  statement_text: string;
+  source_paper_id: string;
+  supporting_passage_id?: string | null;
+  exact_quote?: string | null;
+  page_number?: number | null;
+  relationship: StatementRelationship;
+  is_verified: boolean;
+  match_score: number;
+}
+
+export interface SummarySection {
+  heading: string;
+  content: string;
+  statements: SummaryStatement[];
+}
+
+export interface SummaryResponse {
+  id: string;
+  paper_id: string;
+  project_id?: string | null;
+  title: string;
+  summary_type: SummaryType;
+  content: string;
+  sections: SummarySection[];
+  statements: SummaryStatement[];
+  model_name: string;
+  prompt_version: string;
+  source_references: Array<{
+    statement_id: string;
+    passage_id?: string;
+    page_number?: number;
+    exact_quote?: string;
+    relationship?: string;
+    is_verified?: boolean;
+  }>;
+  total_statements: number;
+  verified_statements: number;
+  faithfulness_rate: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProjectSummariesListResponse {
+  project_id: string;
+  total_summaries: number;
+  summaries: SummaryResponse[];
+}
