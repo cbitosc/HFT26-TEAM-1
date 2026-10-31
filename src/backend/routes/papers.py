@@ -1,8 +1,11 @@
 from typing import List, Optional
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, status, Query
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, status, Query, BackgroundTasks
 from supabase_client import supabase
 from models.paper import PaperDetailResponse, PaperUploadResponse, SignedUrlResponse
+from models.passage import ProcessingStatusResponse, PassagesListResponse
 from services.ingestion_service import IngestionService
+from services.passage_service import PassageService
+from services.processing_tracker import ProcessingTracker
 
 router = APIRouter(prefix="/api/papers", tags=["Papers"])
 
@@ -29,7 +32,6 @@ async def upload_papers(
     results: List[PaperUploadResponse] = []
     
     for file in files:
-        # Validate MIME and extension
         filename_lower = (file.filename or "").lower()
         if not filename_lower.endswith(".pdf"):
             raise HTTPException(
@@ -57,6 +59,72 @@ async def upload_papers(
             )
 
     return results
+
+@router.post("/{paper_id}/process", status_code=status.HTTP_202_ACCEPTED)
+def process_paper(
+    paper_id: str,
+    background_tasks: BackgroundTasks,
+    force_retry: bool = Query(False, description="Force re-processing if already completed or failed")
+):
+    """
+    Triggers background PDF processing, layout extraction, and sentence-bounded passage segmentation.
+    Includes concurrency lock protection against duplicate concurrent processing.
+    """
+    # Check paper exists
+    p_res = supabase.table("papers").select("id, total_pages").eq("id", paper_id).execute()
+    if not p_res.data:
+        raise HTTPException(status_code=404, detail="Paper not found")
+
+    total_pages = p_res.data[0].get("total_pages") or 1
+
+    # Try acquiring processing lock
+    acquired = ProcessingTracker.start_job(paper_id, total_pages=total_pages)
+    if not acquired:
+        if not force_retry:
+            raise HTTPException(
+                status_code=409,
+                detail="Paper is currently being processed by another worker. Please wait."
+            )
+        else:
+            # Force reset job state
+            ProcessingTracker.fail_job(paper_id, "Aborted by forced retry request")
+            ProcessingTracker.start_job(paper_id, total_pages=total_pages)
+
+    # Spawn background worker
+    background_tasks.add_task(PassageService.process_paper_pipeline, paper_id)
+
+    return {
+        "paper_id": paper_id,
+        "status": "processing",
+        "message": "Background PDF processing pipeline initiated.",
+        "polling_endpoint": f"/api/papers/{paper_id}/processing-status"
+    }
+
+@router.get("/{paper_id}/processing-status", response_model=ProcessingStatusResponse)
+def get_paper_processing_status(paper_id: str):
+    """
+    Polls real-time progress and phase of paper processing.
+    """
+    status_data = ProcessingTracker.get_status(paper_id)
+    return ProcessingStatusResponse(**status_data)
+
+@router.get("/{paper_id}/passages", response_model=PassagesListResponse)
+def get_paper_passages(
+    paper_id: str,
+    page: Optional[int] = Query(None, description="Filter by page number"),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0)
+):
+    """
+    Returns segmented passages for a paper with pagination, section headings, and extraction method.
+    """
+    # Verify paper exists
+    p_check = supabase.table("papers").select("id").eq("id", paper_id).execute()
+    if not p_check.data:
+        raise HTTPException(status_code=404, detail="Paper not found")
+
+    res = PassageService.get_passages_for_paper(paper_id=paper_id, page=page, limit=limit, offset=offset)
+    return PassagesListResponse(**res)
 
 @router.get("/{paper_id}", response_model=PaperDetailResponse)
 def get_paper(paper_id: str):
@@ -125,7 +193,6 @@ def get_paper_pdf_url(paper_id: str, expires_in: int = Query(3600, ge=60, le=864
 
         file_path = p_res.data[0]["file_path"]
         
-        # Generate time-limited signed URL from private storage bucket
         signed_res = supabase.storage.from_("papers").create_signed_url(file_path, expires_in)
         signed_url = signed_res.get("signedURL") or signed_res.get("signedUrl")
         if not signed_url:
@@ -150,7 +217,7 @@ def delete_paper(paper_id: str):
         
         file_path = p_res.data[0]["file_path"]
 
-        # Delete database record (cascades to chunks, sections, workspace links, evidence)
+        # Delete database record (cascades to chunks, sections, passages, workspace links)
         supabase.table("papers").delete().eq("id", paper_id).execute()
 
         # Delete storage object

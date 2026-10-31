@@ -3,6 +3,8 @@ from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, HTTPException, status
 from supabase_client import supabase
 from models.project import ProjectCreate, ProjectUpdate, ProjectResponse, ProjectDetailResponse
+from models.passage import ProjectProcessingStatusResponse
+from services.passage_service import PassageService
 
 router = APIRouter(prefix="/api/projects", tags=["Projects"])
 
@@ -207,4 +209,20 @@ def list_project_papers(project_id: str):
         raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Database error: {str(exc)}")
+
+@router.get("/{project_id}/processing-status", response_model=ProjectProcessingStatusResponse)
+def get_project_processing_status(project_id: str):
+    try:
+        # Validate project exists
+        ws_res = supabase.table("research_workspaces").select("id").eq("id", project_id).execute()
+        if not ws_res.data:
+            raise HTTPException(status_code=404, detail="Project not found")
+
+        res = PassageService.get_project_processing_status(project_id)
+        return ProjectProcessingStatusResponse(**res)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(exc)}")
+
 
