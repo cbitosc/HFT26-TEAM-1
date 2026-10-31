@@ -103,3 +103,4 @@ class OutputClaimsResponse(BaseModel):
     compound_claims_count: int
     categories_breakdown: Dict[str, int]
     created_at: str
+

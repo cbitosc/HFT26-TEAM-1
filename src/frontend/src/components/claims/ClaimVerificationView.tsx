@@ -875,3 +875,4 @@ export const ClaimVerificationView: React.FC<ClaimVerificationViewProps> = ({
     </div>
   );
 };
+
