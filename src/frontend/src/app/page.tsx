@@ -10,6 +10,7 @@ import { ResearchPapersView } from "../components/papers/ResearchPapersView";
 import { PaperIntelligenceView } from "../components/intelligence/PaperIntelligenceView";
 import { ResearchSummariesView } from "../components/summaries/ResearchSummariesView";
 import { CrossPaperSynthesisView } from "../components/synthesis/CrossPaperSynthesisView";
+import { ClaimVerificationView } from "../components/claims/ClaimVerificationView";
 import { PlaceholderView } from "../components/common/PlaceholderView";
 import { SettingsView } from "../components/settings/SettingsView";
 import { CreateProjectModal } from "../components/projects/CreateProjectModal";
@@ -51,16 +52,9 @@ export default function Home() {
         );
       case "claims":
         return (
-          <PlaceholderView
-            title="Claim Verification Center"
-            phase="Phase 4"
-            description="Atomic claim decomposition engine categorizing propositions into Supported, Contradicted, and Unresolved verdicts with strict evidence thresholds."
-            features={[
-              "Atomic claim decomposition (Subject-Predicate-Object)",
-              "Tri-state verification (Supported, Contradicted, Unresolved)",
-              "Deterministic citation & substring validation",
-              "Exact character offset mapping"
-            ]}
+          <ClaimVerificationView
+            currentProject={activeProject}
+            onSelectProject={(p) => setActiveProject(p)}
           />
         );
       case "evidence":

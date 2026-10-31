@@ -323,3 +323,85 @@ export interface ProjectComparisonsListResponse {
   total_comparisons: number;
   comparisons: ComparisonResponse[];
 }
+
+// Phase 6: Atomic Claim Decomposition Types
+export type ClaimCategory =
+  | 'numerical'
+  | 'comparative'
+  | 'methodological'
+  | 'dataset'
+  | 'result'
+  | 'generalization'
+  | 'limitation'
+  | 'descriptive_factual'
+  | 'mixed';
+
+export type ClaimVerificationStatus =
+  | 'UNVERIFIED'
+  | 'SUPPORTED'
+  | 'CONTRADICTED'
+  | 'UNRESOLVED';
+
+export interface AtomicClaim {
+  id: string;
+  output_id: string;
+  project_id: string;
+  source_paper_id?: string | null;
+  original_text: string;
+  normalized_text: string;
+  paragraph_index: number;
+  sentence_index: number;
+  claim_index: number;
+  original_position: {
+    paragraph_index?: number;
+    sentence_index?: number;
+    claim_index?: number;
+    start_char?: number;
+    end_char?: number;
+    [key: string]: any;
+  };
+  is_atomic: boolean;
+  category: ClaimCategory;
+  decomposition_notes: string;
+  verification_status: ClaimVerificationStatus;
+  confidence_score: number;
+  created_at: string;
+}
+
+export interface SentenceDecomposition {
+  sentence_index: number;
+  original_sentence: string;
+  start_char: number;
+  end_char: number;
+  claims: AtomicClaim[];
+}
+
+export interface ParagraphDecomposition {
+  paragraph_index: number;
+  original_paragraph: string;
+  sentences: SentenceDecomposition[];
+}
+
+export interface DecomposeClaimsRequest {
+  output_id: string;
+  project_id: string;
+  original_text?: string;
+  paper_ids?: string[];
+  force_regenerate?: boolean;
+}
+
+export interface OutputClaimsResponse {
+  output_id: string;
+  project_id: string;
+  original_text: string;
+  paragraphs: ParagraphDecomposition[];
+  claims: AtomicClaim[];
+  total_paragraphs: number;
+  total_sentences: number;
+  total_claims: number;
+  atomic_claims_count: number;
+  compound_claims_count: number;
+  categories_breakdown: Record<string, number>;
+  created_at: string;
+}
+
