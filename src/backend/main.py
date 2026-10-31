@@ -5,27 +5,39 @@ from fastapi.responses import JSONResponse
 try:
     from .supabase_client import supabase
     from .config import SUPABASE_URL, SUPABASE_SECRET_KEY
+    from .routes import projects, papers, workspaces
 except ImportError:
     from supabase_client import supabase
     from config import SUPABASE_URL, SUPABASE_SECRET_KEY
+    from routes import projects, papers, workspaces
 
 app = FastAPI(
     title="VERITAS API",
-    description="Evidence-first AI Research Assistant",
+    description="Evidence-first AI Research Assistant for Verifiable Summaries & Cross-Paper Synthesis",
     version="1.0.0"
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Register Core API Routers
+app.include_router(projects.router)
+app.include_router(papers.router)
+app.include_router(workspaces.router)
+
 @app.get("/")
 def root():
-    return {"message": "VERITAS API is running"}
+    return {
+        "product": "VERITAS",
+        "tagline": "Every claim has evidence. Every disagreement has context. Every uncertainty is visible.",
+        "status": "online",
+        "version": "1.0.0"
+    }
 
 @app.get("/health")
 def health_check():
