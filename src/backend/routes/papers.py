@@ -3,9 +3,11 @@ from fastapi import APIRouter, UploadFile, File, Form, HTTPException, status, Qu
 from supabase_client import supabase
 from models.paper import PaperDetailResponse, PaperUploadResponse, SignedUrlResponse
 from models.passage import ProcessingStatusResponse, PassagesListResponse
+from models.intelligence import PaperIntelligenceResponse
 from services.ingestion_service import IngestionService
 from services.passage_service import PassageService
 from services.processing_tracker import ProcessingTracker
+from services.intelligence_service import PaperIntelligenceService
 
 router = APIRouter(prefix="/api/papers", tags=["Papers"])
 
@@ -207,6 +209,40 @@ def get_paper_pdf_url(paper_id: str, expires_in: int = Query(3600, ge=60, le=864
         raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Storage error: {str(exc)}")
+
+@router.post("/{paper_id}/intelligence", response_model=PaperIntelligenceResponse)
+def generate_paper_intelligence(
+    paper_id: str,
+    force_regenerate: bool = Query(False, description="Force re-extraction of paper intelligence")
+):
+    """
+    Triggers structured Paper Intelligence extraction across 7 core research dimensions.
+    All evidence references are verified against source passages.
+    """
+    try:
+        return PaperIntelligenceService.get_or_generate_intelligence(
+            paper_id=paper_id,
+            force_regenerate=force_regenerate
+        )
+    except ValueError as val_err:
+        raise HTTPException(status_code=400, detail=str(val_err))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Intelligence extraction failed: {str(exc)}")
+
+@router.get("/{paper_id}/intelligence", response_model=PaperIntelligenceResponse)
+def get_paper_intelligence(paper_id: str):
+    """
+    Retrieves the structured intelligence profile for a paper with verified evidence citations.
+    """
+    intel = PaperIntelligenceService.get_paper_intelligence(paper_id)
+    if not intel:
+        try:
+            return PaperIntelligenceService.generate_paper_intelligence(paper_id=paper_id)
+        except ValueError as val_err:
+            raise HTTPException(status_code=404, detail=str(val_err))
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"Failed to generate intelligence: {str(exc)}")
+    return intel
 
 @router.delete("/{paper_id}", status_code=status.HTTP_200_OK)
 def delete_paper(paper_id: str):

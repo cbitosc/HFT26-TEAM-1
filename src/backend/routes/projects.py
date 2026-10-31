@@ -4,7 +4,9 @@ from fastapi import APIRouter, HTTPException, status
 from supabase_client import supabase
 from models.project import ProjectCreate, ProjectUpdate, ProjectResponse, ProjectDetailResponse
 from models.passage import ProjectProcessingStatusResponse
+from models.intelligence import ProjectIntelligenceSummary
 from services.passage_service import PassageService
+from services.intelligence_service import PaperIntelligenceService
 
 router = APIRouter(prefix="/api/projects", tags=["Projects"])
 
@@ -224,5 +226,39 @@ def get_project_processing_status(project_id: str):
         raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Database error: {str(exc)}")
+
+@router.post("/{project_id}/intelligence/generate", response_model=ProjectIntelligenceSummary)
+def generate_project_intelligence(project_id: str):
+    """
+    Batch extracts structured intelligence across all papers linked to this project.
+    """
+    try:
+        # Validate project exists
+        ws_res = supabase.table("research_workspaces").select("id").eq("id", project_id).execute()
+        if not ws_res.data:
+            raise HTTPException(status_code=404, detail="Project not found")
+
+        return PaperIntelligenceService.extract_project_intelligence(project_id)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to generate project intelligence: {str(exc)}")
+
+@router.get("/{project_id}/intelligence", response_model=ProjectIntelligenceSummary)
+def get_project_intelligence(project_id: str):
+    """
+    Retrieves structured intelligence profiles for all papers in this project.
+    """
+    try:
+        # Validate project exists
+        ws_res = supabase.table("research_workspaces").select("id").eq("id", project_id).execute()
+        if not ws_res.data:
+            raise HTTPException(status_code=404, detail="Project not found")
+
+        return PaperIntelligenceService.extract_project_intelligence(project_id)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve project intelligence: {str(exc)}")
 
 

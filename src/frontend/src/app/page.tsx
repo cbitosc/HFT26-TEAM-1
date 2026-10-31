@@ -7,12 +7,13 @@ import { DashboardView } from "../components/dashboard/DashboardView";
 import { ProjectList } from "../components/projects/ProjectList";
 import { MultiPdfUpload } from "../components/papers/MultiPdfUpload";
 import { ResearchPapersView } from "../components/papers/ResearchPapersView";
+import { PaperIntelligenceView } from "../components/intelligence/PaperIntelligenceView";
 import { PlaceholderView } from "../components/common/PlaceholderView";
 import { SettingsView } from "../components/settings/SettingsView";
 import { CreateProjectModal } from "../components/projects/CreateProjectModal";
 
 export default function Home() {
-  const { activeTab } = useProject();
+  const { activeTab, activeProject, setActiveProject } = useProject();
   const [createModalOpen, setCreateModalOpen] = useState(false);
 
   const renderContent = () => {
@@ -27,18 +28,9 @@ export default function Home() {
         return <ResearchPapersView />;
       case "intelligence":
         return (
-          <PlaceholderView
-            title="Paper Intelligence & Structured Extraction"
-            phase="Phase 2"
-            description="Deep structured information extraction capturing study objectives, methodologies, sample sizes, benchmark datasets, empirical metrics, and author-acknowledged limitations."
-            features={[
-              "Objective & research hypothesis extraction",
-              "Methodological architecture classification",
-              "Dataset & sample size parameters",
-              "Empirical metrics & performance tracking",
-              "Limitation extraction for research gaps",
-              "Page-level citation provenance"
-            ]}
+          <PaperIntelligenceView
+            currentProject={activeProject}
+            onSelectProject={(p) => setActiveProject(p)}
           />
         );
       case "summaries":
