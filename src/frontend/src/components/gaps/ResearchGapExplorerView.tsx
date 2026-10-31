@@ -461,3 +461,4 @@ export function ResearchGapExplorerView({
     </div>
   );
 }
+

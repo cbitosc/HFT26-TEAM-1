@@ -115,3 +115,4 @@ def get_project_ledger(project_id: str):
         raise HTTPException(status_code=404, detail=f"Project '{project_id}' not found.")
 
     return AuditService.get_project_ledger(project_id)
+
