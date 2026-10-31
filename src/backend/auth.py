@@ -260,3 +260,4 @@ def verify_project_ownership(project_id: str, user: Optional[AuthUser] = None):
         raise
     except Exception as e:
         logger.debug(f"Project ownership check warning: {e}")
+
