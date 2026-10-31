@@ -11,6 +11,7 @@ import { PaperIntelligenceView } from "../components/intelligence/PaperIntellige
 import { ResearchSummariesView } from "../components/summaries/ResearchSummariesView";
 import { CrossPaperSynthesisView } from "../components/synthesis/CrossPaperSynthesisView";
 import { ClaimVerificationView } from "../components/claims/ClaimVerificationView";
+import { EvidenceExplorerView } from "../components/evidence/EvidenceExplorerView";
 import { PlaceholderView } from "../components/common/PlaceholderView";
 import { SettingsView } from "../components/settings/SettingsView";
 import { CreateProjectModal } from "../components/projects/CreateProjectModal";
@@ -59,30 +60,16 @@ export default function Home() {
         );
       case "evidence":
         return (
-          <PlaceholderView
-            title="Interactive PDF Evidence Explorer"
-            phase="Phase 4"
-            description="Split-screen dual-canvas PDF viewer synchronizing verified claims directly to physical bounding boxes on the original academic paper pages."
-            features={[
-              "Split-screen responsive PDF canvas",
-              "Real-time bounding box highlight overlays",
-              "Bidirectional citation clicking",
-              "Physical page token alignment"
-            ]}
+          <EvidenceExplorerView
+            currentProject={activeProject}
+            onSelectProject={(p) => setActiveProject(p)}
           />
         );
       case "matrix":
         return (
-          <PlaceholderView
-            title="Evidence Comparison Matrix"
-            phase="Phase 4"
-            description="Interactive comparison matrix aligning uploaded papers across user-selected dimensions (Architecture, Dataset, Accuracy, Compute, Limitations)."
-            features={[
-              "Dynamic dimension headers",
-              "Paper-by-paper cell comparison",
-              "Evidence quote tooltips with page pointers",
-              "Interactive heatmap & filtering"
-            ]}
+          <EvidenceExplorerView
+            currentProject={activeProject}
+            onSelectProject={(p) => setActiveProject(p)}
           />
         );
       case "gaps":

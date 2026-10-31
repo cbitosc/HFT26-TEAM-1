@@ -20,6 +20,15 @@ from .verification import (
     VerifyBatchResponse,
     ProjectVerificationSummary,
 )
+from .matrix import (
+    CellStatus,
+    MatrixCell,
+    MatrixRow,
+    ComparisonMatrixResponse,
+    GenerateMatrixRequest,
+    PassageContextResponse,
+    PdfAccessResponse,
+)
 
 __all__ = [
     "ClaimCategory",
@@ -39,4 +48,11 @@ __all__ = [
     "VerifyBatchRequest",
     "VerifyBatchResponse",
     "ProjectVerificationSummary",
+    "CellStatus",
+    "MatrixCell",
+    "MatrixRow",
+    "ComparisonMatrixResponse",
+    "GenerateMatrixRequest",
+    "PassageContextResponse",
+    "PdfAccessResponse",
 ]

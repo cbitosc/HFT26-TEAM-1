@@ -20,6 +20,8 @@ export interface Paper {
   mime_type: string;
   status: 'uploaded' | 'processing' | 'EMBEDDED' | 'failed' | string;
   page_count?: number;
+  total_pages?: number;
+  venue?: string | null;
   authors?: string[];
   publication_year?: number | null;
   abstract?: string | null;
@@ -480,5 +482,81 @@ export interface ProjectVerificationSummary {
   unverified_count: number;
   faithfulness_rate: number;
 }
+
+// Phase 8: Evidence Explorer & Comparison Matrix Types
+export type CellStatus =
+  | 'evidence_present'
+  | 'evidence_conflicting'
+  | 'evidence_unavailable'
+  | 'not_reported';
+
+export interface MatrixCell {
+  paper_id: string;
+  paper_title: string;
+  content: string;
+  passage_id?: string | null;
+  page_number?: number | null;
+  section_title?: string | null;
+  exact_quote?: string | null;
+  status: CellStatus;
+  relationship?: string | null;
+}
+
+export interface MatrixRow {
+  dimension: string;
+  claim_label: string;
+  cells: Record<string, MatrixCell>;
+}
+
+export interface ComparisonMatrixResponse {
+  id: string;
+  project_id: string;
+  title: string;
+  paper_ids: string[];
+  paper_meta: Array<{
+    id: string;
+    title: string;
+    authors?: string[];
+    year?: number | null;
+    venue?: string | null;
+  }>;
+  dimensions: string[];
+  rows: MatrixRow[];
+  total_cells: number;
+  evidence_present_count: number;
+  not_reported_count: number;
+  created_at: string;
+}
+
+export interface GenerateMatrixRequest {
+  project_id: string;
+  paper_ids: string[];
+  dimensions?: string[];
+  title?: string;
+}
+
+export interface PassageContextResponse {
+  passage_id: string;
+  paper_id: string;
+  paper_title: string;
+  page_number: number;
+  section_title: string;
+  text: string;
+  previous_context?: string | null;
+  next_context?: string | null;
+  bounding_box: Record<string, any>;
+  sequence_index: number;
+  created_at: string;
+}
+
+export interface PdfAccessResponse {
+  paper_id: string;
+  signed_url: string;
+  expires_in_seconds: number;
+  file_name: string;
+  total_pages: number;
+  file_size_bytes: number;
+}
+
 
 
