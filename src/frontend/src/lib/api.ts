@@ -31,7 +31,12 @@ import {
   GenerateGapsRequest,
   ProjectGapsResponse,
   ProvenanceLedgerEntry,
-  ProjectLedgerResponse
+  ProjectLedgerResponse,
+  EvaluationRun,
+  EvaluationRunSummary,
+  EvaluationRunResponse,
+  ListEvaluationRunsResponse,
+  ProjectAuditDossier
 } from "../types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
@@ -538,6 +543,90 @@ export async function fetchProjectLedger(projectId: string, limit: number = 50):
   }
   return res.json();
 }
+
+// =============================================================================
+// PHASE 10: EVALUATION & REPORT EXPORT API CLIENTS
+// =============================================================================
+
+export async function runEvaluationBenchmark(
+  file?: File,
+  datasetName?: string,
+  targetProjectId?: string,
+  rawContent?: string
+): Promise<EvaluationRunResponse> {
+  if (file) {
+    const formData = new FormData();
+    formData.append("file", file);
+    if (datasetName) formData.append("dataset_name", datasetName);
+    if (targetProjectId) formData.append("target_project_id", targetProjectId);
+
+    const res = await fetch(`${API_BASE_URL}/api/evaluation/run`, {
+      method: "POST",
+      body: formData
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: res.statusText }));
+      throw new Error(err.detail || `Benchmark run failed: ${res.statusText}`);
+    }
+    return res.json();
+  }
+
+  const res = await fetch(`${API_BASE_URL}/api/evaluation/run`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      dataset_name: datasetName || "Custom Benchmark",
+      dataset_content: rawContent || "",
+      target_project_id: targetProjectId
+    })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || `Benchmark run failed: ${res.statusText}`);
+  }
+  return res.json();
+}
+
+export async function fetchEvaluationRuns(): Promise<ListEvaluationRunsResponse> {
+  const res = await fetch(`${API_BASE_URL}/api/evaluation/runs`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || `Failed to fetch evaluation runs: ${res.statusText}`);
+  }
+  return res.json();
+}
+
+export async function fetchEvaluationRun(runId: string): Promise<EvaluationRunResponse> {
+  const res = await fetch(`${API_BASE_URL}/api/evaluation/runs/${runId}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || `Failed to fetch evaluation run: ${res.statusText}`);
+  }
+  return res.json();
+}
+
+export async function fetchBenchmarkTemplate(): Promise<any> {
+  const res = await fetch(`${API_BASE_URL}/api/evaluation/template`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || `Failed to fetch benchmark template: ${res.statusText}`);
+  }
+  return res.json();
+}
+
+export async function fetchProjectAuditDossier(projectId: string): Promise<ProjectAuditDossier> {
+  const res = await fetch(`${API_BASE_URL}/api/projects/${projectId}/export/dossier`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || `Failed to fetch project audit dossier: ${res.statusText}`);
+  }
+  return res.json();
+}
+
+export function getExportDownloadUrl(projectId: string, format: "pdf" | "json" | "csv" | "markdown"): string {
+  return `${API_BASE_URL}/api/projects/${projectId}/export/${format}`;
+}
+
 
 
 

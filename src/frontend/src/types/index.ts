@@ -688,6 +688,171 @@ export interface ProjectLedgerResponse {
   events: ProvenanceLedgerEntry[];
 }
 
+// =============================================================================
+// PHASE 10: EVALUATION & REPORT EXPORT TYPES
+// =============================================================================
+
+export type EvaluationExpectedVerdict = 'Supported' | 'Contradicted' | 'Unresolved';
+
+export type FailureCategory =
+  | 'Retrieval failure (evidence passage not in top-K)'
+  | 'Missing evidence (source paper lacks necessary details)'
+  | 'Incorrect entailment (false positive support)'
+  | 'Incorrect contradiction (false positive contradiction)'
+  | 'Context mismatch (conflicting metric or dataset)'
+  | 'Numerical reasoning failure (calculation or scale error)'
+  | 'Invalid source reference (hallucinated or invalid citation)'
+  | 'Compound claim (multiple propositions mixed)'
+  | 'Ambiguous claim (unresolvable without additional context)'
+  | 'Provider or processing error';
+
+export interface BenchmarkSample {
+  sample_id: string;
+  claim_text: string;
+  expected_verdict: EvaluationExpectedVerdict;
+  source_paper_title?: string | null;
+  source_paper_id?: string | null;
+  gold_evidence_quotes?: string[];
+  domain?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface ClassMetrics {
+  support: number;
+  precision: number;
+  recall: number;
+  f1_score: number;
+}
+
+export interface EvaluationMetrics {
+  total_samples: number;
+  accuracy: number;
+  macro_precision: number;
+  macro_recall: number;
+  macro_f1: number;
+  weighted_precision: number;
+  weighted_recall: number;
+  weighted_f1: number;
+  per_class_metrics: Record<string, ClassMetrics>;
+  confusion_matrix: Record<string, Record<string, number>>;
+  source_link_validity_rate: number;
+  invalid_citation_rate: number;
+  unresolved_rate: number;
+  evidence_sufficiency_rate: number;
+}
+
+export interface EvaluationSampleResult {
+  sample_id: string;
+  claim_text: string;
+  expected_verdict: string;
+  predicted_verdict: string;
+  is_correct: boolean;
+  confidence_score: number;
+  retrieved_passages_count: number;
+  cited_evidence_count: number;
+  has_valid_citation: boolean;
+  failure_category?: FailureCategory | null;
+  failure_explanation?: string | null;
+  is_abstention: boolean;
+  is_justified_abstention: boolean;
+  retrieved_top_passages?: Array<{ passage_id: string; text: string }>;
+}
+
+export interface EvaluationRun {
+  id: string;
+  dataset_name: string;
+  dataset_version: string;
+  created_at: string;
+  duration_seconds: number;
+  model_name: string;
+  prompt_version: string;
+  retrieval_strategy: string;
+  total_samples: number;
+  metrics: EvaluationMetrics;
+  sample_results: EvaluationSampleResult[];
+  failure_summary: Record<string, number>;
+  is_official_run: boolean;
+  notes: string;
+}
+
+export interface EvaluationRunSummary {
+  id: string;
+  dataset_name: string;
+  created_at: string;
+  duration_seconds: number;
+  total_samples: number;
+  accuracy: number;
+  macro_f1: number;
+  weighted_f1: number;
+  source_link_validity_rate: number;
+  is_official_run: boolean;
+}
+
+export interface EvaluationRunResponse {
+  run: EvaluationRun;
+}
+
+export interface ListEvaluationRunsResponse {
+  total_runs: number;
+  runs: EvaluationRunSummary[];
+}
+
+export interface ProjectAuditDossier {
+  meta: {
+    platform: string;
+    report_version: string;
+    generated_at: string;
+    project_id: string;
+    project_name: string;
+    research_question: string;
+    project_created_at: string;
+  };
+  statistics: {
+    total_papers: number;
+    total_claims: number;
+    supported_claims: number;
+    contradicted_claims: number;
+    unresolved_claims: number;
+    faithfulness_rate: number;
+    total_gaps: number;
+    total_ledger_events: number;
+  };
+  papers: Array<{
+    id: string;
+    title: string;
+    authors: string[];
+    publication_year?: number | null;
+    venue: string;
+    total_pages: number;
+    abstract: string;
+  }>;
+  claims: Array<{
+    claim_id: string;
+    category: string;
+    text: string;
+    is_atomic: boolean;
+    verdict: string;
+    confidence_score: number;
+    reasoning: string;
+    cited_evidence: Array<{
+      passage_id: string;
+      paper_id: string;
+      page_number: number;
+      section_title: string;
+      exact_quote: string;
+      is_quote_valid: boolean;
+      match_score: number;
+      explanation: string;
+    }>;
+    limitations: string[];
+    numerical_audit?: any;
+    overgeneralization_audit?: any;
+  }>;
+  research_gaps: any[];
+  provenance_ledger: any[];
+}
+
+
 
 
 

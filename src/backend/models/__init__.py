@@ -43,6 +43,19 @@ from .audit import (
     ProvenanceLedgerEntry,
     ProjectLedgerResponse,
 )
+from .evaluation import (
+    EvaluationExpectedVerdict,
+    FailureCategory,
+    BenchmarkSample,
+    BenchmarkDatasetInfo,
+    ClassMetrics,
+    EvaluationMetrics,
+    EvaluationSampleResult,
+    EvaluationRun,
+    EvaluationRunSummary,
+    EvaluationRunResponse,
+    ListEvaluationRunsResponse,
+)
 
 __all__ = [
     "ClaimCategory",
@@ -81,4 +94,15 @@ __all__ = [
     "LedgerEventType",
     "ProvenanceLedgerEntry",
     "ProjectLedgerResponse",
+    "EvaluationExpectedVerdict",
+    "FailureCategory",
+    "BenchmarkSample",
+    "BenchmarkDatasetInfo",
+    "ClassMetrics",
+    "EvaluationMetrics",
+    "EvaluationSampleResult",
+    "EvaluationRun",
+    "EvaluationRunSummary",
+    "EvaluationRunResponse",
+    "ListEvaluationRunsResponse",
 ]

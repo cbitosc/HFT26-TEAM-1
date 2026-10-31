@@ -56,9 +56,9 @@ const NAV_ITEMS: { category: string; items: NavItem[] }[] = [
   {
     category: "VALIDATION & EXPORT",
     items: [
-      { id: "benchmarks", label: "Evaluation & Benchmarks", icon: Target, badge: "Phase 10", isImplemented: false },
+      { id: "benchmarks", label: "Evaluation & Benchmarks", icon: Target, isImplemented: true },
       { id: "provenance", label: "Provenance Ledger", icon: FileClock, isImplemented: true },
-      { id: "audit", label: "Export & Audit Reports", icon: DownloadCloud, badge: "Phase 10", isImplemented: false },
+      { id: "audit", label: "Export & Audit Reports", icon: DownloadCloud, isImplemented: true },
       { id: "settings", label: "Settings", icon: Settings, isImplemented: true },
     ]
   }

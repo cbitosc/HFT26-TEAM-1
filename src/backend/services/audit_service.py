@@ -586,25 +586,26 @@ class AuditService:
         cls._append_ledger_entry(entry)
 
         # 2. Persist to Supabase audit_reports if available
-        try:
-            payload = {
-                "id": entry.id,
-                "workspace_id": project_id,
-                "total_claims": 1,
-                "supported_claims": 1 if validation_outcome == "SUCCESS" else 0,
-                "contradicted_claims": 0,
-                "unresolved_claims": 0,
-                "overall_faithfulness_rate": 1.0,
-                "report_json": entry.model_dump()
-            }
-            supabase.table("audit_reports").insert(payload).execute()
-        except Exception as e:
-            logger.debug(f"Could not insert audit_reports row: {e}")
+        if not project_id.startswith("test-") and not project_id.startswith("eval-"):
+            try:
+                payload = {
+                    "id": entry.id,
+                    "workspace_id": project_id,
+                    "total_claims": 1,
+                    "supported_claims": 1 if validation_outcome == "SUCCESS" else 0,
+                    "contradicted_claims": 0,
+                    "unresolved_claims": 0,
+                    "overall_faithfulness_rate": 1.0,
+                    "report_json": entry.model_dump()
+                }
+                supabase.table("audit_reports").insert(payload).execute()
+            except Exception as e:
+                logger.debug(f"Could not insert audit_reports row: {e}")
 
         return entry
 
     @classmethod
-    def get_project_ledger(cls, project_id: str) -> ProjectLedgerResponse:
+    def get_project_ledger(cls, project_id: str, limit: int = 100) -> ProjectLedgerResponse:
         """Retrieves full chronological provenance audit chain for a research workspace."""
         cache = cls._load_ledger()
         events_for_proj = [
@@ -612,8 +613,9 @@ class AuditService:
             for e in cache
             if e.get("project_id") == project_id
         ]
-        # Sort chronologically
+        # Sort chronologically descending and apply limit
         events_for_proj.sort(key=lambda x: x.created_at, reverse=True)
+        events_for_proj = events_for_proj[:limit]
 
         return ProjectLedgerResponse(
             project_id=project_id,

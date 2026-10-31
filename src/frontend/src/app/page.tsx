@@ -15,6 +15,8 @@ import { EvidenceExplorerView } from "../components/evidence/EvidenceExplorerVie
 import { ResearchGapExplorerView } from "../components/gaps/ResearchGapExplorerView";
 import { ProvenanceLedgerView } from "../components/ledger/ProvenanceLedgerView";
 import { NumericalTruthAuditView } from "../components/audit/NumericalTruthAuditView";
+import { EvaluationBenchmarkView } from "../components/evaluation/EvaluationBenchmarkView";
+import { ExportAuditView } from "../components/export/ExportAuditView";
 import { PlaceholderView } from "../components/common/PlaceholderView";
 import { SettingsView } from "../components/settings/SettingsView";
 import { CreateProjectModal } from "../components/projects/CreateProjectModal";
@@ -91,16 +93,9 @@ export default function Home() {
         );
       case "benchmarks":
         return (
-          <PlaceholderView
-            title="Evaluation & Organizer Benchmark Suite"
-            phase="Phase 6"
-            description="Automated benchmarking harness running against organizer-provided evaluation datasets to measure precision, recall, and citation faithfulness."
-            features={[
-              "Organizer dataset compatibility",
-              "Top-K retrieval recall & MRR",
-              "Deterministic citation faithfulness benchmark",
-              "Automated metrics scorecards"
-            ]}
+          <EvaluationBenchmarkView
+            currentProject={activeProject}
+            onSelectProject={(p) => setActiveProject(p)}
           />
         );
       case "provenance":
@@ -112,16 +107,9 @@ export default function Home() {
         );
       case "audit":
         return (
-          <PlaceholderView
-            title="Export & Audit Reports"
-            phase="Phase 6"
-            description="Export comprehensive scientific audit dossiers in Markdown, JSON, and PDF formats for academic peer review and technical auditing."
-            features={[
-              "Full provenance export",
-              "Verified vs contradicted breakdown",
-              "Citation faithfulness scorecard",
-              "Peer-review ready reporting"
-            ]}
+          <ExportAuditView
+            currentProject={activeProject}
+            onSelectProject={(p) => setActiveProject(p)}
           />
         );
       case "settings":
