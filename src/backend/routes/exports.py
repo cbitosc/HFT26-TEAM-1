@@ -82,3 +82,4 @@ def download_project_audit_pdf(project_id: str):
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate PDF export: {str(e)}")
+

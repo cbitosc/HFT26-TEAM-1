@@ -109,3 +109,4 @@ def get_evaluation_run(run_id: str):
 def get_benchmark_template():
     """Returns official benchmark schema specifications and example samples."""
     return EvaluationBenchmarkService.get_benchmark_template()
+
