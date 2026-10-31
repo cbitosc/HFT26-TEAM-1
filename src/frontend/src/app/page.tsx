@@ -14,7 +14,6 @@ import { ClaimVerificationView } from "../components/claims/ClaimVerificationVie
 import { EvidenceExplorerView } from "../components/evidence/EvidenceExplorerView";
 import { ResearchGapExplorerView } from "../components/gaps/ResearchGapExplorerView";
 import { ProvenanceLedgerView } from "../components/ledger/ProvenanceLedgerView";
-import { NumericalTruthAuditView } from "../components/audit/NumericalTruthAuditView";
 import { EvaluationBenchmarkView } from "../components/evaluation/EvaluationBenchmarkView";
 import { ExportAuditView } from "../components/export/ExportAuditView";
 import { PlaceholderView } from "../components/common/PlaceholderView";
@@ -80,13 +79,6 @@ export default function Home() {
       case "gaps":
         return (
           <ResearchGapExplorerView
-            currentProject={activeProject}
-            onSelectProject={(p) => setActiveProject(p)}
-          />
-        );
-      case "numerical":
-        return (
-          <NumericalTruthAuditView
             currentProject={activeProject}
             onSelectProject={(p) => setActiveProject(p)}
           />

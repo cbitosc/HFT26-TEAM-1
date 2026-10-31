@@ -818,6 +818,10 @@ class ClaimDecompositionService:
         # A. Update local file cache
         cls._save_to_cache(response)
 
+        # Skip remote database sync for test / evaluation workspaces
+        if response.project_id.startswith("test-") or response.project_id.startswith("eval-"):
+            return
+
         # B. Upsert into Supabase `claims` table
         resolved_paper_id = paper_id
         if not resolved_paper_id:

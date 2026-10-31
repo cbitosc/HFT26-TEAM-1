@@ -443,6 +443,9 @@ export interface ClaimVerificationResult {
   limitations: string[];
   retrieved_passages_count: number;
   numerical_check_passed?: boolean | null;
+  numerical_audit?: NumericalAuditResult | null;
+  overgeneralization_audit?: OvergeneralizationAuditResult | null;
+  warnings?: string[];
   validation_passed: boolean;
   downgraded: boolean;
   downgrade_reason?: string | null;

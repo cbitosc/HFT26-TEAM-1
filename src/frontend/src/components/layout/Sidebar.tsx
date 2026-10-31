@@ -14,7 +14,6 @@ import {
   SearchCode,
   TableProperties,
   Compass,
-  Binary,
   Target,
   FileClock,
   DownloadCloud,
@@ -50,7 +49,6 @@ const NAV_ITEMS: { category: string; items: NavItem[] }[] = [
       { id: "evidence", label: "Evidence Explorer", icon: SearchCode, isImplemented: true },
       { id: "matrix", label: "Comparison Matrix", icon: TableProperties, isImplemented: true },
       { id: "gaps", label: "Research Gap Explorer", icon: Compass, isImplemented: true },
-      { id: "numerical", label: "Numerical Truth Detector", icon: Binary, isImplemented: true },
     ]
   },
   {

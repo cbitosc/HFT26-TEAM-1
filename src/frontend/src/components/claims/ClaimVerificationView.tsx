@@ -26,6 +26,7 @@ import {
   verifyBatchClaims,
   fetchProjectVerificationSummary,
   fetchSignedUrl,
+  fetchClaimVerification,
   auditNumericalClaim,
   auditOvergeneralization
 } from "../../lib/api";
@@ -196,6 +197,19 @@ export const ClaimVerificationView: React.FC<ClaimVerificationViewProps> = ({
         if (c.is_atomic) initialSelected.add(c.id);
       });
       setSelectedClaimIds(initialSelected);
+
+      // Hydrate existing cached verifications for these claims
+      Promise.all(
+        res.claims.map((c) => fetchClaimVerification(c.id).catch(() => null))
+      ).then((loadedVerifications) => {
+        const nextMap: Record<string, ClaimVerificationResult> = {};
+        loadedVerifications.forEach((v) => {
+          if (v && v.claim_id) nextMap[v.claim_id] = v;
+        });
+        if (Object.keys(nextMap).length > 0) {
+          setVerifications((prev) => ({ ...prev, ...nextMap }));
+        }
+      });
     } catch (err: any) {
       console.error("Decomposition failed", err);
       setError(err.message || "Failed to decompose claims into atomic propositions.");
@@ -218,6 +232,11 @@ export const ClaimVerificationView: React.FC<ClaimVerificationViewProps> = ({
       });
 
       setVerifications((prev) => ({ ...prev, [claimId]: res }));
+      if (activeClaim && activeClaim.id === claimId) {
+        setActiveVerification(res);
+        setAuditNumResult(res.numerical_audit || null);
+        setAuditOvergenResult(res.overgeneralization_audit || null);
+      }
 
       // Refresh project summary
       fetchProjectVerificationSummary(selectedProjectId)
@@ -911,6 +930,17 @@ export const ClaimVerificationView: React.FC<ClaimVerificationViewProps> = ({
 
                               {/* Verdict Badge */}
                               {renderVerdictBadge(ver?.verdict)}
+
+                              {/* Automated Audit Warnings Badge */}
+                              {ver?.warnings && ver.warnings.length > 0 && (
+                                <span
+                                  title={ver.warnings.join(" | ")}
+                                  className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-950/60 border border-amber-600/40 text-amber-300 flex items-center gap-1"
+                                >
+                                  <AlertTriangle className="w-2.5 h-2.5 text-amber-400 shrink-0" />
+                                  <span>{ver.warnings.length} {ver.warnings.length === 1 ? "audit warning" : "audit warnings"}</span>
+                                </span>
+                              )}
                             </div>
 
                             {/* Verification Actions */}
@@ -935,8 +965,8 @@ export const ClaimVerificationView: React.FC<ClaimVerificationViewProps> = ({
                                   onClick={() => {
                                     setActiveClaim(claim);
                                     setActiveVerification(ver);
-                                    setAuditNumResult(null);
-                                    setAuditOvergenResult(null);
+                                    setAuditNumResult(ver.numerical_audit || null);
+                                    setAuditOvergenResult(ver.overgeneralization_audit || null);
                                   }}
                                   className="text-[11px] font-semibold px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-cyan-300 flex items-center gap-1 border border-slate-700 transition-colors"
                                 >
@@ -1170,11 +1200,26 @@ export const ClaimVerificationView: React.FC<ClaimVerificationViewProps> = ({
               </div>
             )}
 
-            {/* Phase 9: Advanced Research Audits (Numerical Truth & Scope Detector) */}
+            {/* Consolidated Automated Audit Warnings Banner */}
+            {activeVerification && activeVerification.warnings && activeVerification.warnings.length > 0 && (
+              <div className="p-3 bg-amber-950/40 border border-amber-600/50 rounded-lg text-xs space-y-1.5">
+                <div className="flex items-center gap-1.5 text-amber-300 font-semibold">
+                  <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span>Integrated Audit Warnings ({activeVerification.warnings.length})</span>
+                </div>
+                <ul className="list-disc list-inside space-y-1 text-[11px] text-amber-200/90 pl-1">
+                  {activeVerification.warnings.map((w, idx) => (
+                    <li key={idx}>{w}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Consolidated Research Audits (Numerical Truth & Scope Detector) */}
             <div className="bg-slate-950 p-3.5 rounded-lg border border-slate-800 space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-mono text-cyan-400 uppercase tracking-wider font-bold">
-                  ADVANCED RESEARCH AUDITS (PHASE 9)
+                  INTEGRATED RESEARCH AUDITS (NUMERICAL TRUTH & SCOPE)
                 </span>
                 <div className="flex items-center gap-2">
                   <button
@@ -1183,7 +1228,7 @@ export const ClaimVerificationView: React.FC<ClaimVerificationViewProps> = ({
                     className="px-2.5 py-1 rounded bg-blue-900/40 hover:bg-blue-800/60 text-blue-300 border border-blue-700/50 text-[11px] font-medium flex items-center gap-1 transition disabled:opacity-50"
                   >
                     <Binary className={`w-3 h-3 ${isAuditingNum ? "animate-spin" : ""}`} />
-                    {isAuditingNum ? "Auditing Numerics..." : "Audit Numerics"}
+                    {isAuditingNum ? "Auditing..." : "Re-audit Numerics"}
                   </button>
                   <button
                     onClick={handleAuditOvergeneralization}
@@ -1191,13 +1236,13 @@ export const ClaimVerificationView: React.FC<ClaimVerificationViewProps> = ({
                     className="px-2.5 py-1 rounded bg-purple-900/40 hover:bg-purple-800/60 text-purple-300 border border-purple-700/50 text-[11px] font-medium flex items-center gap-1 transition disabled:opacity-50"
                   >
                     <ShieldCheck className={`w-3 h-3 ${isAuditingOvergen ? "animate-spin" : ""}`} />
-                    {isAuditingOvergen ? "Auditing Scope..." : "Audit Scope"}
+                    {isAuditingOvergen ? "Auditing..." : "Re-audit Scope"}
                   </button>
                 </div>
               </div>
 
               {/* Numerical Audit Outcome */}
-              {auditNumResult && (
+              {auditNumResult ? (
                 <div className="p-2.5 bg-slate-900/90 rounded border border-slate-800 text-xs space-y-1.5">
                   <div className="flex items-center justify-between">
                     <span className="font-semibold text-slate-200">Numerical Truth Result:</span>
@@ -1218,6 +1263,10 @@ export const ClaimVerificationView: React.FC<ClaimVerificationViewProps> = ({
                       {auditNumResult.relative_change_calc && <div>• Relative Change: {auditNumResult.relative_change_calc}</div>}
                     </div>
                   )}
+                </div>
+              ) : (
+                <div className="p-2 bg-slate-900/40 rounded border border-slate-800/50 text-[11px] text-slate-400">
+                  Non-quantitative claim (no numeric values or empirical metrics required).
                 </div>
               )}
 

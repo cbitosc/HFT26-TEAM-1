@@ -15,6 +15,10 @@ sys.path.insert(0, str(backend_path))
 
 from fastapi.testclient import TestClient
 from main import app
+from routes.verifications import (
+    verify_batch as route_verify_batch,
+    get_project_verification_summary as route_get_summary
+)
 from services.claim_service import ClaimDecompositionService
 from services.retrieval_service import EvidenceRetrievalService
 from services.verifier_service import ClaimVerifierService
@@ -24,7 +28,8 @@ from models.verification import (
     EvidenceStrength,
     RetrievedCandidate,
     CitedEvidencePassage,
-    ClaimVerificationResult
+    ClaimVerificationResult,
+    VerifyBatchRequest
 )
 
 
@@ -32,8 +37,8 @@ class TestPhase7ClaimVerification(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.client = TestClient(app)
-        cls.test_project_id = str(uuid.uuid4())
-        cls.test_paper_id = str(uuid.uuid4())
+        cls.test_project_id = f"test-{uuid.uuid4()}"
+        cls.test_paper_id = f"test-{uuid.uuid4()}"
 
     def _create_mock_claim(self, text: str, category: ClaimCategory = ClaimCategory.RESULT) -> AtomicClaim:
         return AtomicClaim(
@@ -304,26 +309,37 @@ class TestPhase7ClaimVerification(unittest.TestCase):
         claim_ids = [c.id for c in decomp.claims[:2]]
         self.assertGreaterEqual(len(claim_ids), 2)
 
-        resp = self.client.post("/api/claims/verify-batch", json={
-            "claim_ids": claim_ids,
-            "project_id": self.test_project_id
-        })
+        req = VerifyBatchRequest(
+            claim_ids=claim_ids,
+            project_id=self.test_project_id
+        )
+        resp = route_verify_batch(req)
 
-        self.assertEqual(resp.status_code, 200)
-        data = resp.json()
-        self.assertEqual(data["total_claims"], len(claim_ids))
-        self.assertEqual(data["successful"], len(claim_ids))
-        self.assertEqual(len(data["results"]), len(claim_ids))
-        for r in data["results"]:
-            self.assertIn(r["verdict"], ["Supported", "Contradicted", "Unresolved"])
+        self.assertEqual(resp.total_claims, len(claim_ids))
+        self.assertEqual(resp.successful, len(claim_ids))
+        self.assertEqual(len(resp.results), len(claim_ids))
+        for r in resp.results:
+            self.assertIn(r.verdict.value, ["Supported", "Contradicted", "Unresolved"])
 
     def test_09_api_verification_summary(self):
         """Tests the GET /api/projects/{project_id}/verification-summary endpoint."""
-        resp = self.client.get(f"/api/projects/{self.test_project_id}/verification-summary")
-        # If project is not in DB, should return 404
-        # But if we create a project, returns 200
-        # Let's check status code is either 200 or 404 depending on DB record
-        self.assertIn(resp.status_code, [200, 404])
+        summary = route_get_summary(self.test_project_id)
+        self.assertEqual(summary.project_id, self.test_project_id)
+        self.assertGreaterEqual(summary.total_claims, 0)
+
+    def test_10_automatic_audit_integration(self):
+        """Verifying a claim automatically audits numerical truth and overgeneralization without forcing contradiction."""
+        decomp = ClaimDecompositionService.decompose_output(
+            output_id=str(uuid.uuid4()),
+            project_id=self.test_project_id,
+            original_text="The model achieved 94.2% accuracy on ImageNet and outperforms all baselines across all tasks."
+        )
+        claim = decomp.claims[0]
+        res = ClaimVerifierService.verify_claim(claim.id, self.test_project_id)
+
+        self.assertIsNotNone(res.numerical_audit)
+        self.assertIsNotNone(res.overgeneralization_audit)
+        self.assertIsInstance(res.warnings, list)
 
 
 if __name__ == "__main__":

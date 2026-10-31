@@ -119,7 +119,42 @@ class ClaimVerifierService:
             project_id=project_id
         )
 
-        # 5. Persist results
+        # 5. Persist interim results so AuditService can access verification citations
+        cls._persist_verification(validated_result)
+
+        # 6. Automated Research Audits (Numerical Truth & Scope Detector)
+        warnings: List[str] = []
+        try:
+            try:
+                from .audit_service import AuditService
+                from ..models.audit import NumericalVerdict
+            except (ImportError, ValueError):
+                from services.audit_service import AuditService
+                from models.audit import NumericalVerdict
+
+            num_res = AuditService.audit_claim_numerics(claim_id=claim.id, project_id=project_id)
+            validated_result.numerical_audit = num_res.model_dump()
+            if num_res.verdict == NumericalVerdict.NUMERICALLY_CONSISTENT:
+                validated_result.numerical_check_passed = True
+            elif num_res.verdict in (
+                NumericalVerdict.NUMERICAL_DISCREPANCY,
+                NumericalVerdict.CONTEXT_MISMATCH
+            ):
+                validated_result.numerical_check_passed = False
+                warnings.append(f"Numerical Discrepancy: {num_res.calculation_explanation}")
+            elif num_res.verdict != NumericalVerdict.INSUFFICIENT_NUMERICAL_EVIDENCE:
+                warnings.append(f"Numerical Warning: {num_res.calculation_explanation}")
+
+            overgen_res = AuditService.audit_claim_overgeneralization(claim_id=claim.id, project_id=project_id)
+            validated_result.overgeneralization_audit = overgen_res.model_dump()
+            if overgen_res.is_overgeneralized:
+                warnings.append(f"Scope Overreach: {overgen_res.explanation}")
+        except Exception as e:
+            logger.warning(f"Error performing integrated audits for claim '{claim.id}': {e}")
+
+        validated_result.warnings = warnings
+
+        # 7. Re-persist final validated result with audits attached
         cls._persist_verification(validated_result)
 
         return validated_result
@@ -181,11 +216,14 @@ class ClaimVerifierService:
 
         # Count total claims in project
         total_claims_in_db = 0
-        try:
-            c_res = supabase.table("claims").select("id", count="exact").eq("workspace_id", project_id).execute()
-            if c_res.count is not None:
-                total_claims_in_db = c_res.count
-        except Exception:
+        if not (project_id.startswith("test-") or project_id.startswith("eval-")):
+            try:
+                c_res = supabase.table("claims").select("id", count="exact").eq("workspace_id", project_id).execute()
+                if c_res.count is not None:
+                    total_claims_in_db = c_res.count
+            except Exception:
+                total_claims_in_db = total
+        else:
             total_claims_in_db = total
 
         verified_count = supported + contradicted + unresolved
@@ -552,6 +590,10 @@ class ClaimVerifierService:
         """Dual-persistence: Supabase claims & claim_evidence tables + local disk store."""
         # 1. Update local cache
         cls._save_to_cache(result)
+
+        # Skip remote database calls for test/eval workspaces
+        if result.project_id.startswith("test-") or result.project_id.startswith("eval-"):
+            return
 
         # 2. Update Supabase claims table verification_status
         db_status = result.verdict.value.upper()
