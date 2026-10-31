@@ -499,3 +499,4 @@ class MatrixService:
                 json.dump(store, f, indent=2)
         except Exception as e:
             logger.warning(f"Failed writing matrix cache: {e}")
+

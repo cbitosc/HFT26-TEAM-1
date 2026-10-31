@@ -76,3 +76,4 @@ class PdfAccessResponse(BaseModel):
     file_name: str
     total_pages: int
     file_size_bytes: int
+

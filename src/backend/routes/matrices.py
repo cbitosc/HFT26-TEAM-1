@@ -107,3 +107,4 @@ def get_paper_pdf_access(
         raise HTTPException(status_code=404, detail=str(val_err))
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"PDF access error: {str(exc)}")
+
