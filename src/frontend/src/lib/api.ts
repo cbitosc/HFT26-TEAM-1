@@ -36,10 +36,38 @@ import {
   EvaluationRunSummary,
   EvaluationRunResponse,
   ListEvaluationRunsResponse,
-  ProjectAuditDossier
+  ProjectAuditDossier,
+  AuthUser,
+  AuthResponse
 } from "../types";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+export const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+
+export function getAuthToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem("veritas_auth_token") || sessionStorage.getItem("veritas_auth_token");
+}
+
+export function setAuthToken(token: string | null, remember: boolean = true) {
+  if (typeof window === "undefined") return;
+  if (!token) {
+    localStorage.removeItem("veritas_auth_token");
+    sessionStorage.removeItem("veritas_auth_token");
+  } else if (remember) {
+    localStorage.setItem("veritas_auth_token", token);
+  } else {
+    sessionStorage.setItem("veritas_auth_token", token);
+  }
+}
+
+export function getAuthHeaders(): Record<string, string> {
+  const token = getAuthToken();
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  return headers;
+}
 
 export async function checkBackendHealth(): Promise<boolean> {
   try {
@@ -52,7 +80,7 @@ export async function checkBackendHealth(): Promise<boolean> {
 
 export async function fetchProjects(): Promise<Project[]> {
   const res = await fetch(`${API_BASE_URL}/api/projects`, {
-    headers: { "Content-Type": "application/json" }
+    headers: getAuthHeaders()
   });
   if (!res.ok) {
     throw new Error(`Failed to fetch projects: ${res.statusText}`);
@@ -61,7 +89,9 @@ export async function fetchProjects(): Promise<Project[]> {
 }
 
 export async function fetchProject(id: string): Promise<Project & { papers: Paper[] }> {
-  const res = await fetch(`${API_BASE_URL}/api/projects/${id}`);
+  const res = await fetch(`${API_BASE_URL}/api/projects/${id}`, {
+    headers: getAuthHeaders()
+  });
   if (!res.ok) {
     throw new Error(`Failed to fetch project details: ${res.statusText}`);
   }
@@ -625,6 +655,112 @@ export async function fetchProjectAuditDossier(projectId: string): Promise<Proje
 
 export function getExportDownloadUrl(projectId: string, format: "pdf" | "json" | "csv" | "markdown"): string {
   return `${API_BASE_URL}/api/projects/${projectId}/export/${format}`;
+}
+
+// ============================================================================
+// Phase 11: Authentication & User Workspace Scoping APIs
+// ============================================================================
+
+export async function signupApi(payload: {
+  full_name: string;
+  email: string;
+  password: string;
+  confirm_password?: string;
+}): Promise<AuthResponse> {
+  const res = await fetch(`${API_BASE_URL}/api/auth/signup`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || `Sign up failed: ${res.statusText}`);
+  }
+  return res.json();
+}
+
+export async function loginApi(payload: {
+  email: string;
+  password: string;
+  remember_me?: boolean;
+}): Promise<AuthResponse> {
+  const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || `Login failed: ${res.statusText}`);
+  }
+  return res.json();
+}
+
+export async function forgotPasswordApi(email: string): Promise<{ status: string; message: string; reset_token?: string }> {
+  const res = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || `Password recovery request failed: ${res.statusText}`);
+  }
+  return res.json();
+}
+
+export async function resetPasswordApi(payload: {
+  access_token: string;
+  new_password: string;
+}): Promise<{ status: string; message: string }> {
+  const res = await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || `Password reset failed: ${res.statusText}`);
+  }
+  return res.json();
+}
+
+export async function fetchCurrentUserApi(): Promise<AuthUser> {
+  const res = await fetch(`${API_BASE_URL}/api/auth/me`, {
+    headers: getAuthHeaders()
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || "Session expired or invalid.");
+  }
+  return res.json();
+}
+
+export async function updateProfileApi(payload: {
+  full_name?: string;
+  institution?: string;
+}): Promise<AuthUser> {
+  const res = await fetch(`${API_BASE_URL}/api/auth/profile`, {
+    method: "PUT",
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || `Failed to update profile: ${res.statusText}`);
+  }
+  return res.json();
+}
+
+export async function logoutApi(): Promise<void> {
+  try {
+    await fetch(`${API_BASE_URL}/api/auth/logout`, {
+      method: "POST",
+      headers: getAuthHeaders()
+    });
+  } finally {
+    setAuthToken(null);
+  }
 }
 
 

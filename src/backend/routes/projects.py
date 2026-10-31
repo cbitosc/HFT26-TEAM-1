@@ -1,12 +1,16 @@
 import json
 from typing import List, Dict, Any, Optional
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Depends, status
 from supabase_client import supabase
 from models.project import ProjectCreate, ProjectUpdate, ProjectResponse, ProjectDetailResponse
 from models.passage import ProjectProcessingStatusResponse
 from models.intelligence import ProjectIntelligenceSummary
 from services.passage_service import PassageService
 from services.intelligence_service import PaperIntelligenceService
+try:
+    from ..auth import get_optional_user, verify_project_ownership, AuthUser
+except (ImportError, ValueError):
+    from auth import get_optional_user, verify_project_ownership, AuthUser
 
 router = APIRouter(prefix="/api/projects", tags=["Projects"])
 
@@ -52,7 +56,7 @@ def serialize_project_meta(name: str, topic: Optional[str], rq: Optional[str], d
     }
 
 @router.post("", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED)
-def create_project(payload: ProjectCreate):
+def create_project(payload: ProjectCreate, user: Optional[AuthUser] = Depends(get_optional_user)):
     try:
         record = serialize_project_meta(
             name=payload.name,
@@ -60,6 +64,9 @@ def create_project(payload: ProjectCreate):
             rq=payload.research_question,
             desc=payload.description
         )
+        if user:
+            record["user_id"] = user.id
+
         res = supabase.table("research_workspaces").insert(record).execute()
         if not res.data:
             raise HTTPException(status_code=500, detail="Failed to create project")
@@ -70,13 +77,21 @@ def create_project(payload: ProjectCreate):
         raise HTTPException(status_code=500, detail=f"Database error: {str(exc)}")
 
 @router.get("", response_model=List[ProjectResponse])
-def list_projects():
+def list_projects(user: Optional[AuthUser] = Depends(get_optional_user)):
     try:
-        # Fetch all projects
+        # Fetch projects
         p_res = supabase.table("research_workspaces").select("*").order("created_at", desc=True).execute()
         projects_data = p_res.data or []
         if not projects_data:
             return []
+
+        # If user is authenticated, enforce strict user scoping:
+        # show projects created by this user or legacy unassigned projects
+        if user:
+            projects_data = [
+                p for p in projects_data
+                if not p.get("user_id") or str(p.get("user_id")) == str(user.id)
+            ]
 
         # Count papers per project via workspace_papers
         counts_res = supabase.table("workspace_papers").select("workspace_id").execute()
@@ -95,8 +110,11 @@ def list_projects():
         raise HTTPException(status_code=500, detail=f"Database error: {str(exc)}")
 
 @router.get("/{project_id}", response_model=ProjectDetailResponse)
-def get_project(project_id: str):
+def get_project(project_id: str, user: Optional[AuthUser] = Depends(get_optional_user)):
     try:
+        # Verify ownership
+        verify_project_ownership(project_id, user)
+
         ws_res = supabase.table("research_workspaces").select("*").eq("id", project_id).execute()
         if not ws_res.data:
             raise HTTPException(status_code=404, detail="Project not found")

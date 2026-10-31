@@ -1,5 +1,5 @@
 from typing import List, Optional
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, status, Query, BackgroundTasks
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends, status, Query, BackgroundTasks
 from supabase_client import supabase
 from models.paper import PaperDetailResponse, PaperUploadResponse, SignedUrlResponse
 from models.passage import ProcessingStatusResponse, PassagesListResponse
@@ -8,6 +8,10 @@ from services.ingestion_service import IngestionService
 from services.passage_service import PassageService
 from services.processing_tracker import ProcessingTracker
 from services.intelligence_service import PaperIntelligenceService
+try:
+    from ..auth import get_optional_user, verify_project_ownership, AuthUser
+except (ImportError, ValueError):
+    from auth import get_optional_user, verify_project_ownership, AuthUser
 
 router = APIRouter(prefix="/api/papers", tags=["Papers"])
 
@@ -187,8 +191,22 @@ def get_paper_chunks(
         raise HTTPException(status_code=500, detail=f"Database error: {str(exc)}")
 
 @router.get("/{paper_id}/pdf-url", response_model=SignedUrlResponse)
-def get_paper_pdf_url(paper_id: str, expires_in: int = Query(3600, ge=60, le=86400)):
+def get_paper_pdf_url(
+    paper_id: str,
+    expires_in: int = Query(3600, ge=60, le=86400),
+    user: Optional[AuthUser] = Depends(get_optional_user)
+):
     try:
+        # Check workspace ownership if paper is associated with a user-scoped project
+        try:
+            wp_res = supabase.table("workspace_papers").select("workspace_id").eq("paper_id", paper_id).execute()
+            for row in (wp_res.data or []):
+                verify_project_ownership(row["workspace_id"], user)
+        except HTTPException:
+            raise
+        except Exception:
+            pass
+
         p_res = supabase.table("papers").select("file_path").eq("id", paper_id).execute()
         if not p_res.data:
             raise HTTPException(status_code=404, detail="Paper not found")

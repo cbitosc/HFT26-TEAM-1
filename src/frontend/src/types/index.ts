@@ -855,6 +855,23 @@ export interface ProjectAuditDossier {
   provenance_ledger: any[];
 }
 
+// Phase 11: Authentication & User Workspace Scoping
+export interface AuthUser {
+  id: string;
+  email: string;
+  full_name: string;
+  institution?: string | null;
+  created_at: string;
+}
+
+export interface AuthResponse {
+  access_token: string;
+  token_type: string;
+  user: AuthUser;
+  message?: string | null;
+}
+
+
 
 
 

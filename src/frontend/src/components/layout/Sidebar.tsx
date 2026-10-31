@@ -1,7 +1,9 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { useProject } from "../../context/ProjectContext";
+import { useAuth } from "../../context/AuthContext";
+import { ProfileModal } from "../auth/ProfileModal";
 import {
   LayoutDashboard,
   FolderKanban,
@@ -12,13 +14,12 @@ import {
   GitMerge,
   ShieldCheck,
   SearchCode,
-  TableProperties,
   Compass,
-  Target,
-  FileClock,
   DownloadCloud,
   Settings,
-  Sparkles
+  Sparkles,
+  User,
+  LogOut
 } from "lucide-react";
 
 interface NavItem {
@@ -47,16 +48,14 @@ const NAV_ITEMS: { category: string; items: NavItem[] }[] = [
       { id: "synthesis", label: "Cross-Paper Synthesis", icon: GitMerge, isImplemented: true },
       { id: "claims", label: "Claim Verification", icon: ShieldCheck, isImplemented: true },
       { id: "evidence", label: "Evidence Explorer", icon: SearchCode, isImplemented: true },
-      { id: "matrix", label: "Comparison Matrix", icon: TableProperties, isImplemented: true },
       { id: "gaps", label: "Research Gap Explorer", icon: Compass, isImplemented: true },
     ]
   },
   {
     category: "VALIDATION & EXPORT",
     items: [
-      { id: "benchmarks", label: "Evaluation & Benchmarks", icon: Target, isImplemented: true },
-      { id: "provenance", label: "Provenance Ledger", icon: FileClock, isImplemented: true },
-      { id: "audit", label: "Export & Audit Reports", icon: DownloadCloud, isImplemented: true },
+      { id: "validation", label: "Validation Center", icon: ShieldCheck, isImplemented: true },
+      { id: "export", label: "Export & Reports", icon: DownloadCloud, isImplemented: true },
       { id: "settings", label: "Settings", icon: Settings, isImplemented: true },
     ]
   }
@@ -64,6 +63,8 @@ const NAV_ITEMS: { category: string; items: NavItem[] }[] = [
 
 export function Sidebar() {
   const { activeTab, setActiveTab, activeProject } = useProject();
+  const { user, logout } = useAuth();
+  const [profileOpen, setProfileOpen] = useState(false);
 
   return (
     <aside className="w-64 bg-white border-r border-slate-200 flex flex-col h-screen shrink-0 select-none">
@@ -150,14 +151,48 @@ export function Sidebar() {
         ))}
       </div>
 
-      {/* Footer Info */}
-      <div className="p-4 border-t border-slate-100 text-[11px] text-slate-400">
-        <div className="flex items-center justify-between">
-          <span>CBIT Hacktoberfest '26</span>
-          <span className="font-semibold text-slate-500">Team OrbitX</span>
+      {/* User Profile Footer */}
+      {user && (
+        <div className="p-3 border-t border-slate-100 bg-slate-50/50">
+          <div
+            onClick={() => setProfileOpen(true)}
+            className="p-2 rounded-xl hover:bg-slate-100 cursor-pointer transition flex items-center justify-between gap-2"
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-lg bg-blue-600 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-xs">
+                {user.full_name ? user.full_name.charAt(0).toUpperCase() : user.email.charAt(0).toUpperCase()}
+              </div>
+              <div className="min-w-0">
+                <div className="text-xs font-bold text-slate-800 truncate">
+                  {user.full_name || user.email.split("@")[0]}
+                </div>
+                <div className="text-[10px] text-slate-400 truncate">
+                  {user.institution || user.email}
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                logout();
+              }}
+              title="Log Out"
+              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
+      )}
+
+      {/* Footer Info */}
+      <div className="px-4 py-3 border-t border-slate-100 text-[10px] text-slate-400 flex items-center justify-between">
+        <span>CBIT Hacktoberfest '26</span>
+        <span className="font-semibold text-slate-500">Team OrbitX</span>
       </div>
+
+      {/* Profile Modal */}
+      <ProfileModal isOpen={profileOpen} onClose={() => setProfileOpen(false)} />
     </aside>
   );
 }
-
